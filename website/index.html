@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Orch Documentation</title>
+    </head>
+    <body>
+        <div data-scope="docsApp">
+            <section style="padding: 2rem; max-width: 800px; margin: auto">
+                <h1>📚 Orch Documentation</h1>
+
+                <div style="margin-bottom: 1rem">
+                    <label for="doc-select" class="visually-hidden">Select File</label>
+                    <select
+                        id="doc-select"
+                        data-bind="selectedFile"
+                        aria-label="Select Documentation File"
+                    >
+                        <option value="" disabled>Select a file...</option>
+                        <option
+                            data-for="file in availableFiles"
+                            data-bind="file"
+                            data-value="file"
+                        ></option>
+                    </select>
+                </div>
+
+                <!-- Loading state (uses isLoading exposed by docsApp) -->
+                <div data-if="isLoading">
+                    <p role="status" aria-live="polite"><em>Loading…</em></p>
+                </div>
+
+                <!-- Rendered Markdown Content -->
+                <div
+                    data-if="renderedHtml"
+                    data-bind="renderedHtml"
+                    data-html
+                    data-role="markdown"
+                    role="article"
+                    aria-label="Documentation Content"
+                    style="white-space: pre-wrap"
+                ></div>
+
+                <!-- Fallback message -->
+                <div data-if="!renderedHtml">
+                    <p><em>No documentation selected.</em></p>
+                </div>
+            </section>
+        </div>
+
+        <style>
+            .visually-hidden {
+                position: absolute;
+                width: 1px;
+                height: 1px;
+                padding: 0;
+                margin: -1px;
+                overflow: hidden;
+                clip: rect(0, 0, 0, 0);
+                white-space: nowrap;
+                border: 0;
+            }
+        </style>
+
+        <!-- Minimal bootstrap: call setup + mount (WASM-compliant, no getContext) -->
+        <script type="module">
+            import {mount} from "orch";
+            import {setupDocsViewerApp} from "./docsApp.js";
+
+            setupDocsViewerApp();
+            mount();
+        </script>
+    </body>
+</html>

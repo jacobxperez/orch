@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Orch Docs Viewer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+      body {
+        font-family: sans-serif;
+        padding: 2rem;
+        max-width: 800px;
+        margin: auto;
+      }
+      select {
+        padding: 0.5rem;
+        font-size: 1rem;
+        margin-bottom: 1rem;
+        width: 100%;
+        max-width: 400px;
+      }
+      div[aria-label="Documentation Content"] {
+        white-space: pre-wrap;
+        margin-top: 1rem;
+      }
+      p {
+        color: #777;
+        font-style: italic;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div data-scope="docsViewer">
+      <!-- File Selector -->
+      <select data-bind="currentDoc" aria-label="Select documentation">
+        <option value="">Select a Doc</option>
+        <option
+          data-for="doc in availableDocs"
+          data-bind="doc.label"
+          data-value="doc.value"
+        ></option>
+      </select>
+
+      <!-- Rendered Markdown Content -->
+      <div data-if="markdown">
+        <div data-bind="markdown" data-html aria-label="Documentation Content"></div>
+      </div>
+
+      <!-- Fallback message -->
+      <div data-if="!markdown">
+        <p>Select a document to view.</p>
+      </div>
+    </div>
+
+    <script type="module">
+      import {
+        mount,
+        state,
+        computed,
+        effect,
+        expose,
+        scope,
+        introspect,
+        route,
+        task,
+        fetch
+      } from "orch";
+
+      scope("docsViewer", () => {
+        // ---- discover docs via public introspection (no getContext) ----
+        function readDocs() {
+          try {
+            const i = typeof introspect === "function" ? introspect() : null;
+            const list = i?.docs?.getAll?.() || i?.graph?.getAll?.() || [];
+            return list
+              .filter((e) => typeof e?.file === "string" && e.file.endsWith(".md"))
+              .map((e) => ({
+                label: e.title || e.file.replace(/\.md$/i, ""),
+                value: e.file.replace(/^\.?\/*/, "") // strip leading ./ or /
+              }));
+          } catch {
+            return [];
+          }
+        }
+
+        const availableDocs = state(readDocs(), { key: "availableDocs" });
+
+        // ---- selection (route('doc') if present, else local signal) ----
+        let routeSig = null;
+        try { routeSig = typeof route === "function" ? route("doc") : null; } catch {}
+        const currentDoc = routeSig && typeof routeSig === "function"
+          ? routeSig
+          : state("", { key: "currentDoc" });
+
+        // ensure selection is valid
+        effect(() => {
+          const docs = availableDocs();
+          const chosen = routeSig && typeof routeSig === "function" ? routeSig() : currentDoc();
+          const valid = docs.some((d) => d.value === chosen);
+          if (!valid && docs.length > 0) {
+            const fallback = docs[0].value;
+            currentDoc(fallback);
+            try { if (routeSig?.set) routeSig.set(fallback); } catch {}
+          }
+        }, { key: "validateSelection" });
+
+        // ---- fetch helper: prefer orch.fetch() -> Response, else window.fetch ----
+        async function fetchText(url, opts) {
+          const f = typeof fetch === "function" ? fetch : globalThis.fetch;
+          const res = await f(url, opts);
+          if (typeof res === "string") return res;
+          if (!res || !res.ok) throw new Error(`Fetch failed for ${url} (${res?.status || "no status"})`);
+          return res.text();
+        }
+
+        // ---- async loader via task(), with a lightweight shim ----
+        let loadDoc;
+        try {
+          if (typeof task === "function") {
+            loadDoc = task("docs:load", async (file) => {
+              if (!file) return "";
+              return fetchText(`/docs/${file}`);
+            });
+          }
+        } catch {}
+        if (!loadDoc) {
+          const _loading = state(false);
+          const _error = state(null);
+          const _result = state("");
+          const run = async (file) => {
+            _loading(true); _error(null);
+            try { _result(file ? await fetchText(`/docs/${file}`) : ""); }
+            catch (e) { _error(e); _result(""); console.warn("[Docs] load error:", e); }
+            finally { _loading(false); }
+          };
+          loadDoc = Object.freeze({
+            loading: () => _loading(),
+            error: () => _error(),
+            result: () => _result(),
+            run
+          });
+        }
+
+        const raw = state("", { key: "raw" });
+        const markdown = computed(() => raw(), { key: "markdown" });
+
+        effect(() => {
+          const file = routeSig && typeof routeSig === "function" ? routeSig() : currentDoc();
+          if (!file) { raw(""); return; }
+          try { loadDoc.run(file); } catch (e) { console.warn("[Docs] run error:", e); raw(""); }
+        }, { key: "triggerLoad" });
+
+        effect(() => {
+          try {
+            const r = loadDoc.result?.();
+            if (typeof r === "string") raw(r);
+          } catch {}
+        }, { key: "reflectResult" });
+
+        expose({
+          $data: Object.freeze({
+            role: "docs-viewer",
+            plugin: "Docs",
+            public: true,
+            orchestrated: true
+          }),
+          availableDocs,
+          currentDoc,
+          markdown
+        });
+      });
+
+      mount();
+    </script>
+  </body>
+</html>

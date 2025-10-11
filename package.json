@@ -1,0 +1,35 @@
+{
+  "name": "orch",
+  "version": "0.0.0",
+  "description": "The Reactive AI Orchestrator",
+  "type": "module",
+  "scripts": {
+    "orch:dev": "npm run serve:dev",
+    "orch:serve": "node ./server/index.js --root=orch/website --port=3000",
+    "orch:serve:dev": "node ./server/index.js --root=orch/website --port=3000",
+    "orch:serve:sealed": "node ./server/index.js --root=orch/website --port=3000 --sealed",
+    "orch:serve:docs": "npm run serve -- index.html",
+    "orch:serve:introspect": "npm run serve -- devtools.html"
+  },
+  "exports": {
+    ".": "./system/index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "sideEffects": false,
+  "dependencies": {
+    "glob": "^8.1.0",
+    "mime": "^4.0.7",
+    "orch-kernel": "file:./vendor/orch-kernel"
+  },
+  "devDependencies": {
+    "chokidar": "^4.0.3",
+    "eslint": "^9.27.0",
+    "ignore": "^7.0.4",
+    "prettier": "3.5.3"
+  },
+  "imports": {
+    "orch": "./system/index.js"
+  }
+}

@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <title>Orch Devtools</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <style>
+            #orch-devtools-panel {
+                padding: 1rem;
+                border: 1px solid #ccc;
+                margin-top: 1rem;
+                max-width: 800px;
+            }
+
+            button {
+                margin-top: 1rem;
+                padding: 0.5rem 1rem;
+                font-size: 1rem;
+            }
+
+            input[type="search"],
+            select {
+                margin: 0.5rem 0;
+                padding: 0.25rem;
+                width: 100%;
+                max-width: 400px;
+                display: block;
+            }
+
+            strong {
+                font-size: 1.1rem;
+            }
+        </style>
+    </head>
+
+    <body>
+        <div data-scope="devtools">
+            <!-- Toggle Button -->
+            <button data-on:click="toggle" aria-expanded="true" aria-controls="orch-devtools-panel">
+                Toggle Devtools
+            </button>
+
+            <!-- Devtools Panel -->
+            <div
+                data-if="visible"
+                id="orch-devtools-panel"
+                role="region"
+                aria-label="Orch Devtools Panel"
+            >
+                <input
+                    type="search"
+                    data-bind="search"
+                    placeholder="Search modules..."
+                    aria-label="Search"
+                    autocomplete="off"
+                />
+
+                <select data-bind="pluginFilter" aria-label="Filter by Plugin">
+                    <option value="">All Plugins</option>
+                    <option value="Core">Core</option>
+                    <option value="Utility">Utility</option>
+                    <option value="Orchestrator">Orchestrator</option>
+                    <option value="Devtools">Devtools</option>
+                    <option value="Docs">Docs</option>
+                    <option value="CLI">CLI</option>
+                    <option value="Plugin">Plugin</option>
+                </select>
+
+                <div data-for="entry in filtered">
+                    <div>
+                        <strong data-bind="entry.title"></strong>
+                    </div>
+                    <div>
+                        <small data-bind="entry.plugin"></small> ·
+                        <small data-bind="entry.status"></small>
+                    </div>
+                </div>
+
+                <div data-if="filtered.length === 0">
+                    <em>No matching modules found.</em>
+                </div>
+            </div>
+        </div>
+
+        <script type="module">
+            import {mount, state, computed, expose, scope, effect, introspect} from "orch";
+
+            scope("devtools", () => {
+                const visible = state(true, {key: "visible"});
+                const toggle = () => visible(!visible());
+
+                const search = state("", {key: "search"});
+                const pluginFilter = state("", {key: "pluginFilter"});
+
+                // Source list of entries (reactive signal so we can refresh later if needed)
+                const entries = state([], {key: "entries"});
+
+                // Pull metadata via public introspection surface (no getContext())
+                // Supports either i.graph.getAll() or i.meta.getAll() depending on your setup.
+                function readAllEntries() {
+                    try {
+                        const i = typeof introspect === "function" ? introspect() : null;
+                        const all = i?.graph?.getAll?.() || i?.meta?.getAll?.() || [];
+                        // Normalize shape for the UI
+                        return all.map((e) => ({
+                            title: e.title || e.file || "(untitled)",
+                            description: e.description || "",
+                            plugin: e.plugin || "",
+                            status:
+                                typeof e.status === "string"
+                                    ? e.status
+                                    : e.status === true
+                                      ? "Stable"
+                                      : e.status === false
+                                        ? "Deprecated"
+                                        : "Optional",
+                        }));
+                    } catch {
+                        return [];
+                    }
+                }
+
+                // Initial load + periodic re-read hook (cheap, but lifecycle-safe)
+                effect(
+                    () => {
+                        entries(readAllEntries());
+                    },
+                    {key: "loadEntriesOnce"}
+                );
+
+                const filtered = computed(
+                    () => {
+                        const list = entries();
+                        const term = search().trim().toLowerCase();
+                        const plug = pluginFilter();
+
+                        return list.filter((entry) => {
+                            const matchesSearch =
+                                !term ||
+                                entry.title?.toLowerCase().includes(term) ||
+                                entry.description?.toLowerCase().includes(term);
+                            const matchesPlugin = !plug || entry.plugin === plug;
+                            return matchesSearch && matchesPlugin;
+                        });
+                    },
+                    {key: "filtered"}
+                );
+
+                expose({
+                    $data: Object.freeze({
+                        role: "devtools-panel",
+                        plugin: "Devtools",
+                        public: true,
+                        orchestrated: true,
+                        description: "WASM-compliant devtools surface",
+                    }),
+                    visible,
+                    toggle,
+                    search,
+                    pluginFilter,
+                    filtered,
+                });
+            });
+
+            mount();
+        </script>
+    </body>
+</html>
