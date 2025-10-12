@@ -1,11 +1,3 @@
----
-license: "Apache License 2.0"
-file: "orch/TRADEMARK.md"
-title: "TRADEMARK.Md"
-description: "Replace this with a meaningful description"
-version: "1.0.0"
----
-
 # Trademark Policy for Orch™
 
 © 2025 Jacob Perez. All rights reserved.  
@@ -23,7 +15,7 @@ The name **Orch**, the wordmark **Orch™**, and all associated logos, CLI ident
 
 You may use the name **Orch™** only when:
 
-- Referring to the **official Orch system**, unmodified and intact
+- Referring to the **official Orch orchestration system**, unmodified and intact
 - Citing Orch in educational, academic, or comparative works
 
 > Use of any Orch brand label constitutes trademark usage and must remain accurate, traceable, and structurally compliant.
@@ -71,7 +63,7 @@ Violations may result in:
 To request permission for extended brand usage or commercial trademark licensing:
 
 **Jacob Perez**  
-📬 `license@orch.run`
+📬 `N/A`
 
 ---
 
