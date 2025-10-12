@@ -1,7 +1,3 @@
----
-file: orch/README.md
----
-
 # Orch™
 
 ![banner](./website/assets/banner.png)
