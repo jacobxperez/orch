@@ -4,6 +4,8 @@ file: orch/README.md
 
 # Orch™
 
+![banner](./website/assets/banner.png)
+
 **The Reactive AI Orchestrator**  
 *“We are the music makers, And we are the dreamers of dreams.”*  
 — Arthur O’Shaughnessy, *Ode*, 1873
