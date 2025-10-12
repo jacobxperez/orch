@@ -1,14 +1,23 @@
 {
-  "version": "1.3.0-8dc5a89c",
-  "graphHash": "8dc5a89c77b1a57b03c1b2de4681796e0a42f0c1d1ef3db9e3d47c1ff737e8ad",
-  "sha256": "44ecf675f8faf0f1711a85edf129634bd441f02c67ae3cc3171836ce38ec9b38",
-  "sizeBytes": 1519505,
-  "builtAt": "2025-08-27T08:26:21.444Z",
-  "nodeVersion": "v22.18.0",
+  "version": "1.3.0-68844a0f",
+  "weightedVersion": "1.3.0",
+  "graphHash": "9a0d5e08bbbc0684e4c221ab1a53a4ac783888e04aa7d35691d985dd54a96543",
+  "sha256": "e3c64a22225e76d7bffcfde366cae65b3d51dc534fab6afb78cf2a530b73250e",
+  "sizeBytes": 1524782,
+  "builtAt": "2025-10-12T06:58:12.520Z",
+  "nodeVersion": "v22.20.0",
   "env": "development",
   "debug": false,
   "kernel": "js",
   "noMinify": false,
   "reportOnly": false,
-  "withWasm": false
+  "withWasm": false,
+  "embedded": {
+    "section": "orch.fingerprint",
+    "format": "orch.fingerprint/v1",
+    "algo": "sha256-pre",
+    "sha256Pre": "04d837ae591337338f5ab7e4972a36ee5281284b9fc03a5280383d80a7b56a78",
+    "sizeBytesPre": 1524454,
+    "builtAtEmbedded": "2025-10-12T06:58:12.520Z"
+  }
 }
