@@ -1,3 +1,11 @@
+---
+license: "BSL-1.1 (Custom - No Auto-Conversion)"
+file: "orch/COMMERCIAL.md"
+title: "Commercial Licensing for Orch™"
+description: "Defines the commercial licensing terms for the sealed Orch runtime (`orch.wasm`), outlining permitted non-commercial usage, commercial license triggers, and available models."
+version: "1.0.0"
+---
+
 # Commercial Licensing for Orch
 
 ## Quick Overview
