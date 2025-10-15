@@ -1,3 +1,11 @@
+---
+license: "BSL-1.1 (Custom - No Auto-Conversion)"
+file: "orch/LICENSE-BSL.md"
+title: "Business Source License 1.1 (Custom – No Auto-Conversion)"
+description: "Custom adaptation of the Business Source License 1.1 used by Orch. Retains the non-commercial grant while permanently removing the automatic conversion clause to ensure long-term protection of the sealed orchestration runtime."
+version: "1.0.0"
+---
+
 # Business Source License 1.1 (Custom – No Auto-Conversion)
 
 This Orch source code is made available under a customized version of the Business Source License 1.1 (BSL-1.1).  
