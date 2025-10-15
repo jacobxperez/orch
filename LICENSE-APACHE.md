@@ -1,3 +1,11 @@
+---
+license: "Apache License 2.0"
+file: "orch/LICENSE-APACHE.md"
+title: "Apache License 2.0 (Standard Text)"
+description: "Standard text of the Apache License 2.0 governing all public API proxies and open-source components within the Orch public repository."
+version: "2.0.0"
+---
+
                                  Apache License
                            Version 2.0, January 2004
                         http://www.apache.org/licenses/
