@@ -1,11 +1,3 @@
----
-license: "BSL-1.1 (Custom - No Auto-Conversion)"
-file: "orch/TRADEMARK.md"
-title: "Trademark Policy for Orch™"
-description: "Official public trademark policy governing all usage of the Orch™ wordmark, logos, CLI identifiers, and certification labels."
-version: "1.0.0"
----
-
 # Trademark Policy for Orch™
 
 © 2025 Jacob Perez. All rights reserved.  

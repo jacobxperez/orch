@@ -1,11 +1,3 @@
----
-license: "BSL-1.1 (Custom - No Auto-Conversion)"
-file: "orch/LICENSE.md"
-title: "Orch Dual License Overview"
-description: "Defines the dual licensing model for Orch — Apache 2.0 for public API proxies and a custom Business Source License (BSL-1.1) for the sealed orchestration runtime and internal systems."
-version: "1.0.0"
----
-
 # Orch Dual License
 
 Orch is distributed under a **dual license**:
