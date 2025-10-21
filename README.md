@@ -8,6 +8,17 @@
 
 ---
 
+## Download Orch™
+
+**Get the latest release of Orch™ below.**
+
+- **[Download v1.0.0](https://github.com/yourusername/orch/releases/latest)**  
+- All previous versions and release notes are available on the [Releases page](https://github.com/yourusername/orch/releases).
+
+> The logo above represents the Orch™ software as distributed in downloadable binary form under Class 9 of the USPTO Trademark Classification.
+
+---
+
 ## About
 
 **Orch™ is not a framework.**  
@@ -82,6 +93,7 @@ All orchestration is enforced inside the sealed runtime — developers use Orch;
 
 ## Using Orch (SDK Style)
 
+    ```js
     import { state, effect, scope } from 'orch';
 
     scope('counter', () => {
@@ -90,6 +102,7 @@ All orchestration is enforced inside the sealed runtime — developers use Orch;
         console.log(`Count: ${count.data().value}`);
       });
     });
+    ```
 
 The above runs **inside** Orch’s sealed orchestration runtime.  
 No manual lifecycle management, no hidden magic — just lawful, introspectable execution.
@@ -140,3 +153,8 @@ Orch™ is distributed under a **dual license**:
 | `orch/system/*` (public proxies)| Apache 2.0                                        |
 | `orch.wasm`                     | BSL-1.1 (Custom – No Auto-Conversion)             |
 | Docs & examples (unless noted)  | Apache 2.0                                        |
+
+---
+
+*Trademark Notice:*  
+**Orch™** and the Orch logo are trademarks of the project owner in the United States and other countries. This README and accompanying release assets constitute proof of use in commerce for downloadable software under Class 9.
