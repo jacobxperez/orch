@@ -12,10 +12,7 @@
 
 **Get the latest release of Orch™ below.**
 
-- **[Download v1.0.0](https://github.com/yourusername/orch/releases/latest)**  
-- All previous versions and release notes are available on the [Releases page](https://github.com/yourusername/orch/releases).
-
-> The logo above represents the Orch™ software as distributed in downloadable binary form under Class 9 of the USPTO Trademark Classification.
+- **[Download Orch Preview](https://github.com/jacobxperez/orch/archive/refs/heads/main.zip)**  
 
 ---
 
