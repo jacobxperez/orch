@@ -53,7 +53,7 @@ Unlike systems that rely on hooks, lifecycles, or config trees, Orch treats orch
 - Run on the sealed orchestration runtime (`orch.wasm`)  
 - Inspect every node through introspectable methods
 
-All orchestration is enforced inside the sealed runtime — developers use Orch; they don’t control it.
+All orchestration is enforced inside the sealed runtime.
 
 ---
 
