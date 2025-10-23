@@ -10,7 +10,7 @@
 
 ## Download Orch™
 
-**Get the latest release of Orch™ below.**
+**Get the latest build of Orch™ below.**
 
 - **[Download Orch Preview](https://github.com/jacobxperez/orch/archive/refs/heads/main.zip)**  
 
