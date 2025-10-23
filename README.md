@@ -153,5 +153,4 @@ Orch™ is distributed under a **dual license**:
 
 ---
 
-*Trademark Notice:*  
 **Orch™** and the Orch logo are trademarks of the project owner in the United States and other countries. This README and accompanying release assets constitute proof of use in commerce for downloadable software under Class 9.
