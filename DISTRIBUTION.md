@@ -12,6 +12,7 @@ This means:
 - The sealed Orch runtime artifact is publicly downloadable for evaluation only.
 - Production, hosted, embedded, internal business, OEM, or commercial use of the sealed runtime requires a commercial license.
 - Official certification, host redistribution, runtime re-hosting, and official host rights require separate written permission.
+- Third-party developers may create open-source projects that integrate with Orch, but they may not include, bundle, redistribute, re-host, modify, clone, repack, or replace the sealed Orch runtime unless separately permitted.
 
 This document explains the distribution model in plain language. It does not replace the license files, EULA, trademark policy, or any signed commercial agreement.
 
@@ -113,6 +114,39 @@ A commercial license is required for uses including:
 
 Commercial licensing terms are described in [COMMERCIAL.md](./COMMERCIAL.md).
 
+## Open-Source Third-Party Projects
+
+You may create and publish open-source projects that integrate with Orch.
+
+Open-source third-party projects may include, for example:
+
+- adapters
+- examples
+- tools
+- SDK extensions
+- documentation
+- integration utilities
+- ecosystem extensions
+- separate modules that work with Orch through public host bridges
+
+Your own integration code may use an open-source license of your choice, provided that your project complies with the applicable Orch license terms and does not grant rights you do not have.
+
+Open-source licensing of your own project does not grant any right to:
+
+- include the sealed runtime in your project
+- bundle the sealed runtime with your project
+- mirror or re-host the sealed runtime
+- auto-fetch the sealed runtime
+- publish the sealed runtime to package registries
+- place the sealed runtime in containers
+- distribute the sealed runtime through CDNs
+- modify, clone, repack, reverse engineer, or replace the sealed runtime
+- use the sealed runtime in production without a commercial license
+- provide hosted, embedded, OEM, internal business, customer-facing, or commercial runtime use without a commercial license
+- claim official Orch certification, endorsement, sponsorship, affiliation, host approval, or production compatibility
+
+A third-party open-source project should instruct users to obtain the sealed Orch runtime from the official Orch distribution source and to comply with the Orch Runtime EULA.
+
 ## Redistribution and Re-Hosting
 
 The public availability of the Runtime Artifact Set does not grant a right to redistribute, mirror, bundle, re-host, sublicense, sell, publish to package registries, place in containers, distribute through CDNs, or include the runtime in third-party products.
@@ -188,6 +222,7 @@ The Orch public distribution model is intended to provide:
 - a path from evaluation to commercial production licensing
 - a protected trademark and certification surface
 - an ecosystem extension point for separate integrations and Auxiliary Modules
+- a path for third-party open-source projects to integrate with Orch without redistributing the sealed runtime
 
 ## What the Public Model Is Not
 
@@ -196,6 +231,7 @@ The Orch public distribution model is not:
 - an open-source license for the sealed runtime
 - permission to use the sealed runtime in production without a commercial license
 - permission to redistribute or re-host the sealed runtime
+- permission to include the sealed runtime in third-party open-source projects
 - permission to modify, clone, repack, or replace the sealed runtime
 - permission to remove or bypass attestation, provenance, policy, or observability features
 - permission to use Orch trademarks as part of another product name
@@ -228,9 +264,9 @@ A company hosts Orch-powered orchestration for third-party users.
 
 This requires a commercial license and may require additional host, redistribution, or certification terms.
 
-### Example 5: Third-Party Integration
+### Example 5: Third-Party Open-Source Integration
 
-A developer creates an “Acme Toolkit for Orch” that works with Orch through public host bridges and does not bundle, auto-fetch, mirror, modify, or re-host the sealed runtime.
+A developer creates an open-source “Acme Toolkit for Orch” that works with Orch through public host bridges and does not bundle, auto-fetch, mirror, modify, re-host, or redistribute the sealed runtime.
 
 This may be allowed, subject to Apache License 2.0, the Runtime EULA, and the Trademark Policy. The developer must not imply official endorsement or certification.
 
@@ -244,6 +280,6 @@ This is not allowed under the public distribution model and does not create offi
 
 Orch separates public integration from sealed runtime authority.
 
-The public repository gives developers a practical way to learn, integrate, and evaluate Orch. The sealed runtime remains protected, production rights are commercially licensed, and official certification rights remain gated.
+The public repository gives developers a practical way to learn, integrate, and evaluate Orch. Developers may create separate open-source projects that integrate with Orch, but the sealed runtime remains protected, production rights are commercially licensed, and official certification rights remain gated.
 
 This model is designed to support broad developer adoption without turning the sealed runtime, certification surface, or Orch brand authority into unrestricted redistribution rights.
