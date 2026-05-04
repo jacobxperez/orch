@@ -1,0 +1,22 @@
+{
+  "abi": "orch.abi/v1",
+  "abiHash": "25e1ba2a020d42c73aa377d6eb2bb2114f8adab98eca7f10c2079157d6d2de06",
+  "kernel": "as",
+  "schema": "orch.public-wasm-build-meta/v1",
+  "sourceMap": false,
+  "targets": {
+    "browser": {
+      "file": "orch.browser.wasm",
+      "previewTarget": "browser",
+      "sha256": "52aec23e373adb7711a9d61b356d78c62f4ae5369ad9bd20b61ae3f6bbe0538f",
+      "sizeBytes": 38323
+    },
+    "wasi": {
+      "file": "orch.wasi.wasm",
+      "previewTarget": "wasi-p1",
+      "sha256": "7f0df12ff16a948ce839bb103b196b604d42592ef48bc50abf35ef4e5af4f29f",
+      "sizeBytes": 38320
+    }
+  },
+  "version": "4.8.0-dc58a81e"
+}

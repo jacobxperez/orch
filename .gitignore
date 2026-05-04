@@ -1,0 +1,47 @@
+# Node & tool caches
+node_modules/
+.nyc_output/
+.cache/
+.parcel-cache/
+.verdaccio_storage/
+
+# Build targets
+/target/
+dist/
+lib/
+parcel-bundle-reports/
+sourcemap-info.json
+
+# Editors/IDE
+.DS_Store
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# keep personal files ignored
+.vscode/launch.json
+.vscode/tasks.json
+.idea/
+
+# Minified bundles
+*.min.js
+
+# Logs
+logs/
+*.log
+log.json
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Temp
+tmp
+
+# Other
+**/MANIFEST.json
+**/meta.json
+**/graph.json
+**/repo.json
+**/*.map
+**/*.zip
+**/*.tar.gz
