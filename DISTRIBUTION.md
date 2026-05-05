@@ -4,7 +4,7 @@
 
 Orch uses a **public artifact distribution model**.
 
-The public Orch repository is designed to let developers inspect, learn, integrate, and evaluate Orch while preserving the separate license boundary for the sealed runtime artifact.
+The public Orch distribution is designed to let developers inspect, learn, integrate, and evaluate Orch while preserving the separate license boundary for the sealed runtime artifact.
 
 This means:
 
@@ -43,7 +43,7 @@ If this document conflicts with any of those documents, the more specific licens
 
 ## Apache-Licensed Public Integration Layer
 
-Unless explicitly excluded, the public integration materials in `orch/**` are licensed under Apache License 2.0.
+Unless explicitly excluded, the Apache-licensed public integration materials included in the public Orch distribution are licensed under Apache License 2.0.
 
 This public layer may include, for example:
 
@@ -54,7 +54,7 @@ This public layer may include, for example:
 - documentation
 - website materials
 - public integration utilities
-- other non-runtime materials under `orch/**`
+- other non-runtime materials included in the public Orch distribution
 
 You may use, copy, modify, and redistribute Apache-licensed materials under the terms of Apache License 2.0.
 
@@ -66,7 +66,7 @@ The **Runtime Artifact Set** is not licensed under Apache License 2.0.
 
 The Runtime Artifact Set includes:
 
-- `orch/public/wasm/orch*.wasm`
+- the sealed Orch runtime binary named `orch*.wasm`
 - runtime fingerprints
 - runtime manifests
 - runtime notices
@@ -242,13 +242,13 @@ The Orch public distribution model is not:
 
 ### Example 1: Apache-Only Integration
 
-A developer modifies Apache-licensed SDK code, examples, or documentation under `orch/**` and redistributes those changes under Apache License 2.0.
+A developer modifies Apache-licensed SDK code, examples, documentation, or public integration utilities included in the public Orch distribution and redistributes those changes under Apache License 2.0.
 
 This is allowed under Apache License 2.0, provided the developer complies with the Apache license terms and does not include or redistribute the Runtime Artifact Set unless separately permitted.
 
 ### Example 2: Local Runtime Evaluation
 
-A developer downloads the public repository and runs the sealed runtime locally for evaluation, testing, education, research, or prototyping.
+A developer downloads the public Orch distribution and runs the sealed runtime locally for evaluation, testing, education, research, or prototyping.
 
 This is evaluation use and is governed by the Runtime EULA.
 
@@ -280,6 +280,6 @@ This is not allowed under the public distribution model and does not create offi
 
 Orch separates public integration from sealed runtime authority.
 
-The public repository gives developers a practical way to learn, integrate, and evaluate Orch. Developers may create separate open-source projects that integrate with Orch, but the sealed runtime remains protected, production rights are commercially licensed, and official certification rights remain gated.
+The public Orch distribution gives developers a practical way to learn, integrate, and evaluate Orch. Developers may create separate open-source projects that integrate with Orch, but the sealed runtime remains protected, production rights are commercially licensed, and official certification rights remain gated.
 
 This model is designed to support broad developer adoption without turning the sealed runtime, certification surface, or Orch brand authority into unrestricted redistribution rights.

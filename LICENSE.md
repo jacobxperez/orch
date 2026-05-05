@@ -1,6 +1,6 @@
 # Orch License Index
 
-This repository uses a **multi-license boundary** to separate Apache-licensed public integration materials from the sealed Orch runtime artifact.
+The public Orch distribution uses a **multi-license boundary** to separate Apache-licensed public integration materials from the sealed Orch runtime artifact.
 
 For a plain-language explanation of this model, see [DISTRIBUTION.md](./DISTRIBUTION.md).
 
@@ -10,7 +10,7 @@ For a plain-language explanation of this model, see [DISTRIBUTION.md](./DISTRIBU
 
 **Applies to:**
 
-- All content in `orch/**` except the Runtime Artifact Set
+- Apache-licensed public integration materials included in the public Orch distribution, except the Runtime Artifact Set
 
 This includes public proxies, SDKs, CLI tools, docs, examples, website materials, and other public integration surfaces unless explicitly excluded.
 
@@ -24,7 +24,7 @@ See the full license text: [LICENSE-APACHE.md](./LICENSE-APACHE.md)
 
 The Runtime Artifact Set includes:
 
-- `orch/public/wasm/orch*.wasm`
+- the sealed Orch runtime binary named `orch*.wasm`
 - runtime fingerprints
 - runtime manifests
 - runtime notices
@@ -46,9 +46,9 @@ Commercial licensing options: [COMMERCIAL.md](./COMMERCIAL.md)
 
 ## Summary Table
 
-| Component / Path | License Type |
+| Component | License Type |
 | --- | --- |
-| `orch/**` excluding the Runtime Artifact Set | Apache License 2.0 |
+| Apache-licensed public integration materials, excluding the Runtime Artifact Set | Apache License 2.0 |
 | Runtime Artifact Set | Orch Runtime EULA (Evaluation Only) |
 
 ---

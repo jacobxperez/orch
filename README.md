@@ -12,11 +12,11 @@ Download the current Orch public distribution archive:
 
 **[Download Orch](https://github.com/jacobxperez/orch/archive/refs/heads/main.zip)** <<<
 
-> **Commercial note:** The sealed runtime binary (`orch/public/wasm/orch*.wasm`) is licensed for **evaluation use only**.  
+> **Commercial note:** The sealed runtime binary named `orch*.wasm` is licensed for **evaluation use only**.  
 > To use Orch in **production**, **business**, or **embedded** settings, a **commercial license** is required. See **COMMERCIAL.md**.  
 > Evaluation terms are defined in **RUNTIME-EULA.md**.
 
-Orch uses a **public artifact distribution model**. The public repository includes Apache-licensed integration code, documentation, examples, and public SDK/proxy surfaces. The sealed runtime artifact is publicly available for evaluation only and is not open source. Production, hosted, embedded, internal business, OEM, or commercial use of the sealed runtime requires a commercial license.
+Orch uses a **public artifact distribution model**. The public Orch distribution includes Apache-licensed integration code, documentation, examples, and public SDK/proxy surfaces. The sealed runtime artifact is publicly available for evaluation only and is not open source. Production, hosted, embedded, internal business, OEM, or commercial use of the sealed runtime requires a commercial license.
 
 See **DISTRIBUTION.md** for the full public distribution model.
 
@@ -42,7 +42,7 @@ The graph is not a visual add-on. It is the system.
 Think of Orch as a **local Web API for orchestration**:
 
 - **Client SDK semantics** — Public calls such as `state()` and `task()` act as client requests to the sealed orchestration runtime.
-- **WASM service boundary** — Calls execute inside `orch.wasm`, a sealed binary that enforces orchestration rules.
+- **WASM service boundary** — Calls execute inside the sealed runtime binary named `orch*.wasm`, which enforces orchestration rules.
 - **Zero-network execution** — Orch keeps API discipline while running locally.
 - **Stable introspection** — API-visible nodes expose `.data()`, `.status()`, and `.error()` for tooling, auditing, and automation.
 
@@ -56,7 +56,7 @@ Unlike systems that rely on hooks, lifecycles, or config trees, Orch treats orch
 
 - Declare primitives in code.
 - Scope execution with `scope()` or `component()`.
-- Run on the sealed orchestration runtime (`orch.wasm`).
+- Run on the sealed orchestration runtime.
 - Inspect every node through introspectable methods.
 
 All orchestration is enforced inside the sealed runtime.
@@ -78,7 +78,7 @@ All orchestration is enforced inside the sealed runtime.
    Orch is designed around explicit runtime state and observable boundaries.
 
 5. **Sealed orchestration logic**  
-   The orchestration model is enforced in `orch.wasm`, reducing structural drift across public surfaces.
+   The orchestration model is enforced in the sealed runtime, reducing structural drift across public surfaces.
 
 ---
 
@@ -100,11 +100,11 @@ All orchestration is enforced inside the sealed runtime.
 import {state, effect, scope} from 'orch';
 
 scope('counter', () => {
-    const count = state(0);
+   const count = state(0);
 
-    effect(() => {
-        console.log(`Count: ${count.data().value}`);
-    });
+   effect(() => {
+      console.log(`Count: ${count.data().value}`);
+   });
 });
 ```
 
@@ -114,10 +114,10 @@ The above runs through Orch’s sealed orchestration runtime. No manual lifecycl
 
 ## Local Website Preview
 
-To preview the public website locally from the repository root:
+To preview the public website locally from the extracted public Orch distribution root:
 
 ```sh
-node orch/server/index.js --root=orch/docs --port=3000
+node server/index.js --root=docs --port=3000
 ```
 
 Then open:
@@ -132,20 +132,20 @@ The local server is intended for static website testing and trademark-specimen r
 
 ## License
 
-This repository uses a **multi-license boundary**:
+The public Orch distribution uses a **multi-license boundary**:
 
-- **Apache License 2.0** — Applies to **all content in `orch/**`** except the Runtime Artifact Set. This includes public proxies, SDKs, tooling, docs, examples, and other folders under `orch/` unless explicitly excluded. See **LICENSE-APACHE.md**.
+- **Apache License 2.0** — Applies to Apache-licensed public integration materials, except the Runtime Artifact Set. This includes public proxies, SDKs, tooling, docs, examples, and other public integration surfaces unless explicitly excluded. See **LICENSE-APACHE.md**.
 
-- **Orch Runtime EULA** — Applies to the Runtime Artifact Set, including the sealed binary at `orch/public/wasm/orch*.wasm` and its sidecars, including fingerprints, manifests, policy bundles, provenance files, attestation files, integrity files, and notices. See **RUNTIME-EULA.md**. For production or commercial use, see **COMMERCIAL.md**.
+- **Orch Runtime EULA** — Applies to the Runtime Artifact Set, including the sealed runtime binary named `orch*.wasm` and its runtime sidecars, including fingerprints, manifests, policy bundles, provenance files, attestation files, integrity files, and notices. See **RUNTIME-EULA.md**. For production or commercial use, see **COMMERCIAL.md**.
 
 For a plain-language explanation of how Orch separates Apache-licensed public integration materials from the sealed runtime artifact, see **DISTRIBUTION.md**.
 
 ### Summary Table
 
-| Component / Path                                   | License Type                        |
-| -------------------------------------------------- | ----------------------------------- |
-| `orch/**` excluding the Runtime Artifact Set       | Apache License 2.0                  |
-| `orch/public/wasm/orch*.wasm` and runtime sidecars | Orch Runtime EULA (Evaluation Only) |
+| Component                                                                        | License Type                        |
+| -------------------------------------------------------------------------------- | ----------------------------------- |
+| Apache-licensed public integration materials, excluding the Runtime Artifact Set | Apache License 2.0                  |
+| Runtime Artifact Set, including `orch*.wasm` and runtime sidecars                | Orch Runtime EULA (Evaluation Only) |
 
 ---
 

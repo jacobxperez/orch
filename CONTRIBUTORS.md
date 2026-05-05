@@ -4,7 +4,7 @@
 
 This file acknowledges contributors to the public Orch repository.
 
-Public contributions are accepted only for materials that are intended to be part of the public repository, such as Apache-licensed integration code, SDK shims, proxies, documentation, examples, website materials, and other public integration surfaces.
+Public contributions are accepted only for materials that are intended to be part of the public Orch distribution, such as Apache-licensed integration code, SDK shims, proxies, documentation, examples, website materials, and other public integration surfaces.
 
 Do not submit confidential, proprietary, restricted, or third-party materials through public pull requests unless you have written authorization.
 
@@ -12,7 +12,7 @@ Do not submit confidential, proprietary, restricted, or third-party materials th
 
 ## Contribution Terms
 
-Unless you clearly state otherwise in writing at the time of submission, any contribution intentionally submitted for inclusion in Apache-licensed materials in `orch/**` is submitted under the terms of Apache License 2.0.
+Unless you clearly state otherwise in writing at the time of submission, any contribution intentionally submitted for inclusion in Apache-licensed public integration materials is submitted under the terms of Apache License 2.0.
 
 This follows the contribution terms in [LICENSE-APACHE.md](./LICENSE-APACHE.md).
 

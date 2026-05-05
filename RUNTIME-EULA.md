@@ -1,9 +1,9 @@
 # Orch Runtime End-User License Agreement (EULA)
 
 **Effective Date:** 2025-11-02  
-**Applies to:** The Orch Runtime Artifact Set distributed by Jacob Perez (“Licensor”), including the sealed Orch runtime WebAssembly module(s) named `orch*.wasm` and accompanying runtime sidecars in `orch/public/wasm/**`, such as fingerprints, manifests, notices, policy bundles, provenance files, attestation files, and integrity files.
+**Applies to:** The Orch Runtime Artifact Set distributed by Jacob Perez (“Licensor”), including the sealed Orch runtime WebAssembly module(s) named `orch*.wasm` and accompanying runtime sidecars shipped with or for the sealed runtime, such as fingerprints, manifests, notices, policy bundles, provenance files, attestation files, and integrity files.
 
-This agreement does **not** apply to Apache-licensed public integration materials in `orch/**`, such as public proxies, SDK shims, documentation, examples, website materials, or public integration utilities, except where those materials are part of the Runtime Artifact Set.
+This agreement does **not** apply to Apache-licensed public integration materials included in the public Orch distribution, such as public proxies, SDK shims, documentation, examples, website materials, or public integration utilities, except where those materials are part of the Runtime Artifact Set.
 
 By downloading, installing, copying, accessing, or running the Orch Runtime Artifact Set, you accept this EULA. If you do not agree, do not use the Runtime Artifact Set.
 
@@ -11,10 +11,10 @@ By downloading, installing, copying, accessing, or running the Orch Runtime Arti
 
 ## 1. Definitions
 
-- **“Runtime”** means the sealed Orch orchestration binary located at `orch/public/wasm/orch*.wasm`.
+- **“Runtime”** means the sealed Orch orchestration binary named `orch*.wasm`.
 - **“Sidecars”** means files shipped with or for the Runtime to support provenance, integrity, policy, notices, attestation, compatibility, verification, or runtime identity, including fingerprints, manifests, policy bundles, provenance files, attestation files, integrity files, and notices.
 - **“Runtime Artifact Set”** means the Runtime and Sidecars.
-- **“Apache-Licensed Materials”** means materials in `orch/**` that are licensed under Apache License 2.0 and are not part of the Runtime Artifact Set.
+- **“Apache-Licensed Materials”** means Apache-licensed public integration materials included in the public Orch distribution that are not part of the Runtime Artifact Set.
 - **“Evaluation Use”** means non-commercial, non-production use for internal testing, prototyping, education, and research.
 - **“Commercial Use”** means any production, revenue-generating, fee-based, hosted, embedded, OEM, internal business, customer-facing, proprietary, or third-party service use, including use to develop, operate, or provide services, systems, tools, platforms, or products for third parties.
 - **“Policy Bundle”** means a Licensor-signed capability or policy manifest that enables specific host capabilities. The default Runtime posture is deny-all unless a valid Policy Bundle grants narrower capability rights.
@@ -80,7 +80,7 @@ The Runtime may include, depend on, or link to third-party components subject to
 
 This EULA governs the Orch Runtime Artifact Set only.
 
-Apache-Licensed Materials in `orch/**` remain governed by Apache License 2.0 and are not governed by this EULA unless they are part of the Runtime Artifact Set.
+Apache-Licensed Materials remain governed by Apache License 2.0 and are not governed by this EULA unless they are part of the Runtime Artifact Set.
 
 ---
 

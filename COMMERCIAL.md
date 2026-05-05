@@ -4,11 +4,13 @@
 
 The Orch Runtime Artifact Set is provided for **evaluation use** under the **[Orch Runtime EULA](./RUNTIME-EULA.md)**.
 
-The Runtime Artifact Set includes the sealed Orch runtime binary (`orch/public/wasm/orch*.wasm`) and runtime sidecars, such as fingerprints, manifests, notices, policy bundles, provenance files, attestation files, and integrity files.
+The Runtime Artifact Set includes the sealed Orch runtime binary named `orch*.wasm` and accompanying runtime sidecars, such as fingerprints, manifests, notices, policy bundles, provenance files, attestation files, and integrity files.
 
 If you want to use the Orch Runtime Artifact Set in **production**, **beyond non-commercial evaluation inside a business**, **as part of a hosted service**, **inside an embedded system**, **with an OEM product**, or **integrated into proprietary products or workflows**, you must obtain a commercial license.
 
-If your usage is limited to materials in `orch/**` that are covered by the **[Apache License 2.0](./LICENSE-APACHE.md)**, such as public proxies, SDKs, docs, examples, website materials, or public integration utilities, and you comply with those terms, no commercial license is required.
+If your usage is limited to Apache-licensed public integration materials included in the public Orch distribution, such as public proxies, SDKs, docs, examples, website materials, or public integration utilities, and you comply with the **[Apache License 2.0](./LICENSE-APACHE.md)**, no commercial license is required.
+
+You may also create and publish separate open-source third-party projects that integrate with Orch, provided that your project does not include, bundle, mirror, re-host, auto-fetch, publish, redistribute, modify, clone, repack, reverse engineer, or replace the Runtime Artifact Set and does not imply official certification, endorsement, sponsorship, affiliation, or host approval.
 
 For a plain-language explanation of Orch’s public distribution model, see **[DISTRIBUTION.md](./DISTRIBUTION.md)**.
 
@@ -39,7 +41,9 @@ You must obtain a commercial license if your use of the sealed **Orch Runtime** 
 - **Specialized or Regulated Domains**  
   Use in robotics, blockchain or zk stacks, cryptographic execution layers, embedded hardware, real-time systems, hybrid or quantum orchestration systems, or other specialized commercial environments.
 
-If your usage is only of Apache-licensed public proxies, SDKs, tooling, docs, examples, or integration materials in `orch/**`, and you comply with Apache License 2.0, no commercial license is needed.
+If your usage is only of Apache-licensed public proxies, SDKs, tooling, docs, examples, or integration materials included in the public Orch distribution, and you comply with Apache License 2.0, no commercial license is needed.
+
+If you create a separate open-source third-party integration that does not include or redistribute the Runtime Artifact Set and does not use the sealed Orch Runtime beyond evaluation, no commercial license is needed for that separate integration code.
 
 If you use the sealed Orch Runtime or Runtime Artifact Set beyond evaluation, commercial licensing is required.
 
@@ -93,11 +97,13 @@ Unless expressly stated in a signed agreement, a commercial license does not all
 
 ## Relationship to Apache License 2.0
 
-Apache License 2.0 applies only to the Apache-licensed public integration materials in `orch/**`, except the Runtime Artifact Set.
+Apache License 2.0 applies only to the Apache-licensed public integration materials included in the public Orch distribution, except the Runtime Artifact Set.
 
 Apache License 2.0 does not grant production, commercial, redistribution, hosting, re-hosting, or modification rights for the Runtime Artifact Set.
 
 Using Apache-licensed Orch SDKs, proxies, docs, examples, or public integration utilities does not by itself require a commercial license.
+
+Creating a separate open-source third-party integration does not by itself require a commercial license, provided that the project does not include or redistribute the Runtime Artifact Set and does not use the sealed Orch Runtime beyond evaluation.
 
 Using the sealed Orch Runtime or Runtime Artifact Set beyond evaluation does require a commercial license.
 
