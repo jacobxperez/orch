@@ -3,7 +3,7 @@
  * @file orch/docs/styles.css
  * @title Orch Public Website Styles
  * @description Static CSS for the Orch public landing page.
- * @version 0.1.4
+ * @version 0.1.6
  */
 
 @font-face {
@@ -13,7 +13,6 @@
     font-style: normal;
     font-display: swap;
 }
-
 
 @font-face {
     font-family: "TASA Orbiter";
@@ -46,7 +45,6 @@
     font-style: normal;
     font-display: swap;
 }
-
 
 :root {
     --color-bg: #f4f1ea;
@@ -98,12 +96,20 @@ html {
 }
 
 body {
-    min-block-size: 100%;
+    display: grid;
+    grid-template-rows: 1fr auto;
+    min-block-size: 100svh;
+    margin: 0;
+    background: var(--color-bg);
+}
+
+button,
+a {
+    font: inherit;
 }
 
 .site-shell {
     display: grid;
-    min-block-size: 100svh;
     place-items: center;
     padding: var(--page-padding);
 }
@@ -127,7 +133,7 @@ body {
     margin: 0;
     color: var(--color-muted);
     font-size: clamp(1.05rem, 2vw, 1.5rem);
-    font-weight: 450;
+    font-weight: 500;
     line-height: 1.45;
 }
 
@@ -136,7 +142,7 @@ body {
     margin: clamp(1rem, 2.2vw, 1.4rem) auto 0;
     color: var(--color-muted);
     font-size: clamp(0.94rem, 1.6vw, 1.1rem);
-    font-weight: 430;
+    font-weight: 400;
     line-height: 1.55;
 }
 
@@ -197,6 +203,40 @@ body {
     opacity: 0.86;
 }
 
+.site-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    inline-size: 100%;
+    padding: 0 var(--page-padding) clamp(1rem, 2.4vw, 1.5rem);
+    color: var(--color-muted);
+    font-size: 0.78rem;
+    font-weight: 400;
+    line-height: 1.5;
+}
+
+.copyright {
+    margin: 0;
+}
+
+.legal-links {
+    display: inline-flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.75rem;
+}
+
+.legal-links a {
+    color: var(--color-muted);
+    text-decoration: underline;
+    text-underline-offset: 0.18em;
+}
+
+.legal-links a:hover,
+.legal-links a:focus-visible {
+    color: var(--color-text);
+}
+
 .visually-hidden {
     position: absolute;
     inline-size: 1px;
@@ -216,12 +256,22 @@ body {
 
     .hero {
         display: grid;
-        min-block-size: calc(100svh - (var(--page-padding) * 2));
         align-content: center;
     }
 
     .wordmark {
         letter-spacing: -0.07em;
+    }
+
+    .site-footer {
+        flex-direction: column;
+        justify-content: center;
+        gap: 0.45rem;
+        text-align: center;
+    }
+
+    .legal-links {
+        justify-content: center;
     }
 }
 
