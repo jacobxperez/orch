@@ -2,8 +2,8 @@
  * @license Apache License 2.0
  * @file orch/vendor/orch-kernel/index.js
  * @title orch-kernel (dev shim)
- * @description Minimal shim to run the public Orch repo without the sealed WASM kernel. Covers the proxy calls used by orch/system/* in dev. In sealed builds, the real kernel is used.
- * @version 0.5.0
+ * @description Minimal shim to run the public Orch repo without the sealed WASM kernel, including deterministic unsupported public introspection. In sealed builds, the real kernel is used.
+ * @version 0.6.0
  */
 
 /* ──────────────────────────────────────────────────────────
@@ -271,6 +271,14 @@ function dataGetAll() {
     return Array.from(__dataRegistry.values());
 }
 
+function createUnsupportedIntrospectionResult() {
+    return Object.freeze({
+        schemaVersion: 'introspection-unsupported-result.v1',
+        supported: false,
+        reason: 'unsupported',
+    });
+}
+
 /* ──────────────────────────────────────────────────────────
    Kernel shim
    Map proxy call names → dev implementations.
@@ -333,6 +341,8 @@ export const kernel = Object.freeze({
                 return createSchema(args.def);
 
             /* Introspection */
+            case 'createIntrospect':
+                return createUnsupportedIntrospectionResult();
             case 'introspect.register':
                 return introspectRegister(args.key, args.api);
             case 'introspect.get':
