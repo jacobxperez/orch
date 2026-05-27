@@ -3,12 +3,22 @@
  * @file orch/dva/verifyReleaseBundle.js
  * @title Release Bundle Verifier
  * @description Verifier for signed release bundles, admission-bundle membership, artifact verification hashes, trust policy, support windows, revocation, and deterministic audit output.
- * @version 0.1.2
+ * @version 0.1.3
  */
 
 const ZERO_SHA256 =
     '0000000000000000000000000000000000000000000000000000000₀₀₀₀₀₀₀₀';
 const SHA256_HEX_RE = /^[0-9a-f]{64}$/u;
+const FIXED_DVA_COMPANION_ALIASES = new Map([
+    ['dist/orch.release.json', 'orch.release.json'],
+    ['orch.release.json', 'orch.release.json'],
+    ['dist/orch.release.cose', 'orch.release.cose'],
+    ['orch.release.cose', 'orch.release.cose'],
+]);
+const FIXED_DVA_COMPANIONS = new Set([
+    'orch.release.json',
+    'orch.release.cose',
+]);
 const te = new TextEncoder();
 const td = new TextDecoder('utf-8', {fatal: true});
 
@@ -71,6 +81,10 @@ function normalizePath(filePath) {
         throw new TypeError('DVA path must be a non-empty string');
     }
     return filePath.replace(/\\+/gu, '/').replace(/^\/+/u, '').normalize('NFC');
+}
+
+function normalizeFixedDvaCompanionPath(filePath) {
+    return FIXED_DVA_COMPANION_ALIASES.get(filePath) || filePath;
 }
 
 function encodeULEB(n) {
@@ -937,12 +951,47 @@ function parseManifest(manifestBytes) {
 
 function normalizeBundleMembers(members) {
     if (members instanceof Map) {
-        return new Map(Array.from(members.entries()).map(([k, v]) => [normalizePath(k), bytes(v, k)]));
+        return normalizeBundleMemberEntries(Array.from(members.entries()));
     }
     if (isPlainObject(members)) {
-        return new Map(Object.keys(members).map((k) => [normalizePath(k), bytes(members[k], k)]));
+        return normalizeBundleMemberEntries(
+            Object.keys(members).map((k) => [k, members[k]])
+        );
     }
     throw new TypeError('bundle members must be a Map or object');
+}
+
+function normalizeBundleMemberEntries(inputEntries) {
+    const bundle = new Map();
+    const fixedCompanionAliases = new Map();
+    const duplicateFixedCompanionAliases = [];
+
+    for (const [k, v] of inputEntries) {
+        const normalizedPath = normalizePath(k);
+        const memberPath = normalizeFixedDvaCompanionPath(normalizedPath);
+        if (FIXED_DVA_COMPANIONS.has(memberPath)) {
+            const aliases = fixedCompanionAliases.get(memberPath) || [];
+            if (!aliases.includes(normalizedPath)) {
+                aliases.push(normalizedPath);
+                aliases.sort(cmp);
+            }
+            fixedCompanionAliases.set(memberPath, aliases);
+            if (aliases.length === 2) {
+                duplicateFixedCompanionAliases.push({
+                    companion: memberPath,
+                    aliases: [...aliases],
+                });
+            }
+            if (!bundle.has(memberPath)) {
+                bundle.set(memberPath, bytes(v, normalizedPath));
+            }
+            continue;
+        }
+        bundle.set(memberPath, bytes(v, normalizedPath));
+    }
+
+    duplicateFixedCompanionAliases.sort((a, b) => cmp(a.companion, b.companion));
+    return {bundle, duplicateFixedCompanionAliases};
 }
 
 async function verifyReleaseBundle({
@@ -952,13 +1001,25 @@ async function verifyReleaseBundle({
     cryptoProvider,
 } = {}) {
     const errors = [];
-    const bundle = normalizeBundleMembers(members || {});
+    const {
+        bundle,
+        duplicateFixedCompanionAliases,
+    } = normalizeBundleMembers(members || {});
     const selected = normalizePath(selectedArtifact || '');
     const policy = normalizePolicy(trustPolicy);
 
     const manifestBytes = getMember(bundle, 'orch.release.json');
     const coseBytes = getMember(bundle, 'orch.release.cose');
     const selectedBytes = getMember(bundle, selected);
+
+    for (const duplicate of duplicateFixedCompanionAliases) {
+        addError(
+            errors,
+            'duplicate-fixed-companion-alias',
+            'Admission bundle contains both fixed DVA companion aliases.',
+            duplicate
+        );
+    }
 
     if (!selectedBytes) addError(errors, 'missing-selected-artifact', 'Selected artifact is missing.', {selected});
     const missingRequiredMembers = new Set();
