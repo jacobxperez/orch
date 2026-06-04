@@ -3,12 +3,46 @@
  * @file orch/dva/verifyReleaseBundle.js
  * @title Release Bundle Verifier
  * @description Verifier for signed release bundles, admission-bundle membership, artifact verification hashes, trust policy, support windows, revocation, and deterministic audit output.
- * @version 0.1.3
+ * @version 0.2.0
  */
 
 const ZERO_SHA256 =
     '0000000000000000000000000000000000000000000000000000000₀₀₀₀₀₀₀₀';
 const SHA256_HEX_RE = /^[0-9a-f]{64}$/u;
+const TRUST_POLICY_SCHEMA = 'dva:part-b:trust-policy:1';
+const REQUIRED_TRUST_POLICY_FIELDS = [
+    'schema',
+    'trustListVersion',
+    'policyVersion',
+    'trustListTtlSeconds',
+    'staleTrustListBehavior',
+    'offlineVerifierBehavior',
+    'keyRolloverOverlapSeconds',
+    'allowKids',
+    'denyKids',
+];
+const ALLOWED_TRUST_POLICY_FIELDS = new Set([
+    ...REQUIRED_TRUST_POLICY_FIELDS,
+    'ext',
+    'offline',
+    'revocations',
+    'rollover',
+    'supportWindow',
+    'trustListExpiresAt',
+    'trustListIssuedAt',
+    'trustRoots',
+    'verificationTime',
+]);
+const STALE_TRUST_LIST_BEHAVIORS = new Set([
+    'deny',
+    'observe-only',
+    'quarantine',
+]);
+const OFFLINE_VERIFIER_BEHAVIORS = new Set([
+    'allow-if-fresh',
+    'deny',
+    'observe-only',
+]);
 const FIXED_DVA_COMPANION_ALIASES = new Map([
     ['dist/orch.release.json', 'orch.release.json'],
     ['orch.release.json', 'orch.release.json'],
@@ -732,6 +766,7 @@ async function buildAdmissionIdentityInput({
         trustListPolicy: {
             allowKids: policy.allowKids,
             denyKids: policy.denyKids,
+            keyRolloverOverlapSeconds: policy.keyRolloverOverlapSeconds,
             offline: policy.offline,
             offlineVerifierBehavior: policy.offlineVerifierBehavior,
             policyVersion: policy.policyVersion,
@@ -747,19 +782,174 @@ async function buildAdmissionIdentityInput({
     };
 }
 
-function normalizePolicy(policy = {}) {
-    const allowKids = Array.from(new Set(policy.allowKids || [])).sort(cmp);
-    const denyKids = Array.from(new Set(policy.denyKids || [])).sort(cmp);
+function isSerializedPolicy(value) {
+    return (
+        typeof value === 'string' ||
+        value instanceof Uint8Array ||
+        value instanceof ArrayBuffer ||
+        ArrayBuffer.isView(value)
+    );
+}
+
+function parseTrustPolicyInput(input, errors) {
+    if (!isSerializedPolicy(input)) return input;
+    try {
+        const text = typeof input === 'string' ? input : td.decode(bytes(input));
+        assertNoDuplicateJsonKeys(text);
+        return JSON.parse(text);
+    } catch (error) {
+        const message = String(error?.message || error);
+        const duplicateKey = message.startsWith('Duplicate JSON object key:');
+        addError(
+            errors,
+            duplicateKey ? 'duplicate-key-trust-policy' : 'malformed-trust-policy',
+            duplicateKey
+                ? 'Trust policy JSON contains a duplicate object key.'
+                : 'Trust policy JSON is malformed.'
+        );
+        return null;
+    }
+}
+
+function addMalformedPolicyError(errors, message, details = {}) {
+    addError(errors, 'malformed-trust-policy', message, details);
+}
+
+function validateNonEmptyString(policy, field, errors) {
+    if (typeof policy[field] !== 'string' || policy[field].length === 0) {
+        addMalformedPolicyError(
+            errors,
+            `${field} must be a non-empty string.`,
+            {field}
+        );
+    }
+}
+
+function validateInteger(policy, field, minimum, errors) {
+    const value = policy[field];
+    if (
+        !Number.isSafeInteger(value) ||
+        value < minimum
+    ) {
+        addMalformedPolicyError(
+            errors,
+            `${field} must be a safe JSON integer greater than or equal to ${minimum}.`,
+            {field}
+        );
+    }
+}
+
+function validateKidArray(policy, field, errors) {
+    const kids = policy[field];
+    if (!Array.isArray(kids)) {
+        addMalformedPolicyError(errors, `${field} must be an array.`, {field});
+        return;
+    }
+    const seen = new Set();
+    let previous = null;
+    for (let index = 0; index < kids.length; index++) {
+        const kid = kids[index];
+        if (typeof kid !== 'string' || kid.length === 0) {
+            addMalformedPolicyError(
+                errors,
+                `${field}[${index}] must be a non-empty string.`,
+                {field, index}
+            );
+            continue;
+        }
+        if (seen.has(kid)) {
+            addMalformedPolicyError(
+                errors,
+                `${field} must not contain duplicate kid values.`,
+                {field}
+            );
+        }
+        if (previous !== null && cmp(previous, kid) > 0) {
+            addMalformedPolicyError(
+                errors,
+                `${field} must be sorted using the canonical comparator.`,
+                {field}
+            );
+        }
+        seen.add(kid);
+        previous = kid;
+    }
+}
+
+function validateTrustPolicy(policy, errors) {
+    if (!isPlainObject(policy)) {
+        addMalformedPolicyError(errors, 'Trust policy must be a JSON object.');
+        return;
+    }
+
+    for (const field of REQUIRED_TRUST_POLICY_FIELDS) {
+        if (!Object.prototype.hasOwnProperty.call(policy, field)) {
+            addMalformedPolicyError(
+                errors,
+                `Trust policy is missing required field ${field}.`,
+                {field}
+            );
+        }
+    }
+    for (const field of Object.keys(policy).sort(cmp)) {
+        if (!ALLOWED_TRUST_POLICY_FIELDS.has(field)) {
+            addMalformedPolicyError(
+                errors,
+                'Trust policy contains an unknown top-level field.'
+            );
+        }
+    }
+
+    if (policy.schema !== TRUST_POLICY_SCHEMA) {
+        addMalformedPolicyError(
+            errors,
+            `schema must be exactly ${TRUST_POLICY_SCHEMA}.`,
+            {field: 'schema'}
+        );
+    }
+    validateNonEmptyString(policy, 'trustListVersion', errors);
+    validateNonEmptyString(policy, 'policyVersion', errors);
+    validateInteger(policy, 'trustListTtlSeconds', 1, errors);
+    validateInteger(policy, 'keyRolloverOverlapSeconds', 0, errors);
+
+    if (!STALE_TRUST_LIST_BEHAVIORS.has(policy.staleTrustListBehavior)) {
+        addMalformedPolicyError(
+            errors,
+            'staleTrustListBehavior is invalid.',
+            {field: 'staleTrustListBehavior'}
+        );
+    }
+    if (!OFFLINE_VERIFIER_BEHAVIORS.has(policy.offlineVerifierBehavior)) {
+        addMalformedPolicyError(
+            errors,
+            'offlineVerifierBehavior is invalid.',
+            {field: 'offlineVerifierBehavior'}
+        );
+    }
+    if (
+        Object.prototype.hasOwnProperty.call(policy, 'ext') &&
+        !isPlainObject(policy.ext)
+    ) {
+        addMalformedPolicyError(errors, 'ext must be an object.', {field: 'ext'});
+    }
+    validateKidArray(policy, 'allowKids', errors);
+    validateKidArray(policy, 'denyKids', errors);
+}
+
+function normalizePolicy(input, errors) {
+    const policy = parseTrustPolicyInput(input, errors);
+    validateTrustPolicy(policy, errors);
+    if (!isPlainObject(policy)) return null;
     return {
-        schema: policy.schema || 'dva:part-b:trust-policy:1',
-        trustListVersion: policy.trustListVersion || 'unknown',
-        policyVersion: policy.policyVersion || 'unknown',
-        trustListTtlSeconds: policy.trustListTtlSeconds ?? 86400,
-        staleTrustListBehavior: policy.staleTrustListBehavior || 'deny',
-        offlineVerifierBehavior: policy.offlineVerifierBehavior || 'allow-if-fresh',
-        keyRolloverOverlapSeconds: policy.keyRolloverOverlapSeconds ?? 604800,
-        allowKids,
-        denyKids,
+        schema: policy.schema,
+        trustListVersion: policy.trustListVersion,
+        policyVersion: policy.policyVersion,
+        trustListTtlSeconds: policy.trustListTtlSeconds,
+        staleTrustListBehavior: policy.staleTrustListBehavior,
+        offlineVerifierBehavior: policy.offlineVerifierBehavior,
+        keyRolloverOverlapSeconds: policy.keyRolloverOverlapSeconds,
+        allowKids: policy.allowKids,
+        denyKids: policy.denyKids,
         verificationTime: policy.verificationTime || null,
         trustListIssuedAt: policy.trustListIssuedAt || null,
         trustListExpiresAt: policy.trustListExpiresAt || null,
@@ -768,6 +958,17 @@ function normalizePolicy(policy = {}) {
         revocations: policy.revocations || {},
         rollover: policy.rollover || {},
         trustRoots: policy.trustRoots || {},
+    };
+}
+
+function failedPolicyAudit() {
+    return {
+        signerKid: '',
+        trustDecision: 'deny',
+        trustListVersion: '',
+        policyVersion: '',
+        verificationTimestampClass: 'omitted-deterministic',
+        admissionIdentity: '',
     };
 }
 
@@ -868,9 +1069,22 @@ function evaluateTrustPolicy({policy, signerKid, admissionIdentity, manifestRoot
             ? 'cached-trust-clock'
             : 'omitted-deterministic';
     const now = policy.verificationTime;
+    const preexistingErrorCount = errors.length;
+    let policyDecision = 'accept';
 
     if (policy.offline && policy.offlineVerifierBehavior === 'deny') {
         addError(errors, 'offline-denied', 'Offline verification is denied by policy.');
+        policyDecision = 'deny';
+    } else if (
+        policy.offline &&
+        policy.offlineVerifierBehavior === 'observe-only'
+    ) {
+        addError(
+            errors,
+            'offline-observe-only',
+            'Offline verification is observe-only under policy.'
+        );
+        policyDecision = 'observe-only';
     }
     const nowMillis = parseIsoMillis(now, 'verificationTime', errors);
     const explicitExpiryMillis = parseIsoMillis(
@@ -895,6 +1109,7 @@ function evaluateTrustPolicy({policy, signerKid, admissionIdentity, manifestRoot
 
     if (nowMillis != null && expiryMillis != null && nowMillis > expiryMillis) {
         addError(errors, 'stale-trust-list', 'Trust list is stale under policy.', {
+            staleTrustListBehavior: policy.staleTrustListBehavior,
             trustListExpiresAt: policy.trustListExpiresAt,
             trustListIssuedAt: policy.trustListIssuedAt,
             trustListTtlSeconds: policy.trustListTtlSeconds,
@@ -904,6 +1119,14 @@ function evaluateTrustPolicy({policy, signerKid, admissionIdentity, manifestRoot
                     : new Date(ttlExpiryMillis).toISOString(),
             verificationTime: now,
         });
+        if (policy.staleTrustListBehavior === 'deny') {
+            policyDecision = 'deny';
+        } else if (
+            policy.staleTrustListBehavior === 'quarantine' ||
+            policyDecision === 'accept'
+        ) {
+            policyDecision = policy.staleTrustListBehavior;
+        }
     }
     if (now && policy.supportWindow?.notBefore && compareIso(now, policy.supportWindow.notBefore) < 0) {
         addError(errors, 'support-window-not-started', 'Support window has not started.');
@@ -933,7 +1156,20 @@ function evaluateTrustPolicy({policy, signerKid, admissionIdentity, manifestRoot
         addError(errors, 'rollover-overlap-expired', 'Signer rollover overlap is expired.', {kid: signerKid});
     }
 
-    return timeClass;
+    const nonDenyPolicyErrors = new Set([
+        'offline-observe-only',
+        'stale-trust-list',
+    ]);
+    const hasHardFailure =
+        preexistingErrorCount > 0 ||
+        errors.some((error) => !nonDenyPolicyErrors.has(error.code)) ||
+        (errors.some((error) => error.code === 'stale-trust-list') &&
+            policy.staleTrustListBehavior === 'deny');
+
+    return {
+        timeClass,
+        trustDecision: hasHardFailure ? 'deny' : policyDecision,
+    };
 }
 
 function parseManifest(manifestBytes) {
@@ -1001,12 +1237,25 @@ async function verifyReleaseBundle({
     cryptoProvider,
 } = {}) {
     const errors = [];
+    const policy = normalizePolicy(trustPolicy, errors);
+    if (errors.length > 0) {
+        const audit = failedPolicyAudit();
+        return Object.freeze({
+            ok: false,
+            trustDecision: audit.trustDecision,
+            audit,
+            manifestRoot: null,
+            errors: errors.sort(
+                (a, b) => cmp(a.code, b.code) || cmp(a.message, b.message)
+            ),
+        });
+    }
+
     const {
         bundle,
         duplicateFixedCompanionAliases,
     } = normalizeBundleMembers(members || {});
     const selected = normalizePath(selectedArtifact || '');
-    const policy = normalizePolicy(trustPolicy);
 
     const manifestBytes = getMember(bundle, 'orch.release.json');
     const coseBytes = getMember(bundle, 'orch.release.cose');
@@ -1168,7 +1417,7 @@ async function verifyReleaseBundle({
         cryptoProvider
     );
 
-    const timeClass = evaluateTrustPolicy({
+    const policyEvaluation = evaluateTrustPolicy({
         policy,
         signerKid,
         admissionIdentity,
@@ -1176,13 +1425,14 @@ async function verifyReleaseBundle({
         errors,
     });
 
-    const ok = errors.length === 0;
+    const ok =
+        errors.length === 0 && policyEvaluation.trustDecision === 'accept';
     const audit = {
         signerKid: signerKid || '',
-        trustDecision: ok ? 'accept' : 'deny',
+        trustDecision: ok ? 'accept' : policyEvaluation.trustDecision,
         trustListVersion: policy.trustListVersion,
         policyVersion: policy.policyVersion,
-        verificationTimestampClass: timeClass,
+        verificationTimestampClass: policyEvaluation.timeClass,
         admissionIdentity,
     };
 
