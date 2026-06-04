@@ -3,7 +3,7 @@
  * @file orch/dva/verifyArtifactIdentity.js
  * @title Artifact Identity Verifier
  * @description Runtime/public entrypoints for selected-artifact verification and RuntimeError mapping.
- * @version 0.2.0
+ * @version 0.3.0
  */
 
 import {verifyReleaseBundle} from './verifyReleaseBundle.js';
@@ -14,6 +14,7 @@ const POLICY_FAILURE_CODES = new Set([
     'invalid-signature',
     'missing-public-key',
     'offline-denied',
+    'offline-observe-only',
     'revoked-admission-identity',
     'revoked-release-member',
     'revoked-signer',
@@ -107,10 +108,14 @@ function runtimeErrorFromDvaPartBResult(result, options = {}) {
         message: 'DVA verifier denied artifact identity.',
     };
     const mapping = chooseRuntimeMapping(errors);
-    const trustDecision =
-        result?.trustDecision === 'accept' || result?.trustDecision === 'deny'
-            ? result.trustDecision
-            : 'deny';
+    const trustDecision = [
+        'accept',
+        'deny',
+        'observe-only',
+        'quarantine',
+    ].includes(result?.trustDecision)
+        ? result.trustDecision
+        : 'deny';
 
     return buildRuntimeError({
         ...mapping,
