@@ -3,7 +3,7 @@
  * @file orch/system/runtime/verifySealedArtifact.js
  * @title Sealed Artifact Verifier
  * @description Host-callable ONI verifier for sealed Orch kernel artifacts using embedded fingerprint, import sovereignty, target alignment, and DVA/meta consistency checks.
- * @version 0.2.0
+ * @version 0.2.1
  */
 
 import {cborDecode} from '../../../source/wasm/cbor/deterministicCbor.js';
@@ -90,6 +90,22 @@ function pickMetaFingerprint(meta) {
     }
 
     return null;
+}
+
+function verifyMetaFingerprintField({meta, fingerprintPayload, field}) {
+    const metaValue = meta?.[field];
+    if (!isNonEmptyString(metaValue)) return null;
+    const embeddedValue = fingerprintPayload?.[field];
+    if (embeddedValue === metaValue) return null;
+    return fail(
+        'ERR_SCHEMA',
+        `ABI activation mismatch: embedded fingerprint ${field} does not match meta.${field}.`,
+        {
+            field,
+            embedded: embeddedValue ?? null,
+            meta: metaValue,
+        }
+    );
 }
 
 function toSha256BytesWithWebCrypto() {
@@ -214,6 +230,15 @@ async function verifySealedArtifact({
         }
         if (!isNonEmptyString(dva.manifestRoot)) {
             return fail('ERR_SCHEMA', 'Fingerprint payload dva.manifestRoot must be a string.');
+        }
+
+        for (const field of ['abi', 'abiHash']) {
+            const mismatch = verifyMetaFingerprintField({
+                meta,
+                fingerprintPayload,
+                field,
+            });
+            if (mismatch) return mismatch;
         }
 
         const imports = scanImportSet(wasmBytes);
