@@ -3,7 +3,7 @@
  * @file orch/dva/types.d.ts
  * @title Verifier Types
  * @description Type declarations for the runtime verification surface.
- * @version 0.2.0
+ * @version 0.3.0
  */
 
 export type DvaTrustDecision = 'accept' | 'deny' | 'observe-only' | 'quarantine';
@@ -14,19 +14,73 @@ export interface DvaPartBTrustRoot {
 }
 
 export interface DvaPartBTrustPolicy {
+  schema: 'dva:part-b:trust-policy:1';
   trustListVersion: string;
   policyVersion: string;
+  trustListTtlSeconds: number;
+  staleTrustListBehavior: 'deny' | 'observe-only' | 'quarantine';
+  offlineVerifierBehavior: 'allow-if-fresh' | 'deny' | 'observe-only';
+  keyRolloverOverlapSeconds: number;
   allowKids: string[];
-  denyKids?: string[];
-  trustRoots: {keys: DvaPartBTrustRoot[]};
-  verificationTime?: string;
-  trustListExpiresAt?: string;
-  supportWindow?: {notBefore?: string; notAfter?: string};
-  revocations?: {
-    revokedKids?: string[];
-    revokedManifestRoots?: string[];
-    revokedAdmissionIdentities?: string[];
-  };
+  denyKids: string[];
+  ext?: Record<string, unknown>;
+}
+
+export interface DvaPartBTrustRoots {
+  schema: 'dva:part-b:trust-roots:1';
+  keys: DvaPartBTrustRoot[];
+  ext?: Record<string, unknown>;
+}
+
+export interface DvaPartBSupportWindowEntry {
+  file: string;
+  hash: string;
+  manifestRoot: string;
+  disposition: 'admit' | 'observe-only' | 'deny';
+  admittedFrom?: string;
+  admittedUntil?: string;
+  ext?: Record<string, unknown>;
+}
+
+export interface DvaPartBSupportWindowPolicy {
+  schema: 'dva:part-b:support-window:1';
+  supportWindowVersion: string;
+  policyVersion: string;
+  entries: DvaPartBSupportWindowEntry[];
+  ext?: Record<string, unknown>;
+}
+
+export interface DvaPartBRevokedReleaseMember {
+  file: string;
+  hash: string;
+  manifestRoot: string;
+  ext?: Record<string, unknown>;
+}
+
+export interface DvaPartBRevocationState {
+  schema: 'dva:part-b:revocation-state:1';
+  revocationStateVersion: string;
+  policyVersion: string;
+  revokedKids: string[];
+  revokedArtifacts: string[];
+  revokedManifestRoots: string[];
+  revokedReleaseMembers: DvaPartBRevokedReleaseMember[];
+  revokedAdmissionIdentities: string[];
+  ext?: Record<string, unknown>;
+}
+
+export interface DvaPartBTrustMaterialFreshness {
+  schema: 'dva:part-b:trust-material-freshness:1';
+  trustListVersion: string;
+  policyVersion: string;
+  supportWindowVersion: string;
+  revocationStateVersion: string;
+  verificationTimestampClass: 'live-wall-clock' | 'cached-trust-clock' | 'omitted-deterministic';
+  verificationTimestamp?: string;
+  trustListAsOf?: string;
+  supportWindowAsOf?: string;
+  revocationStateAsOf?: string;
+  ext?: Record<string, unknown>;
 }
 
 export interface DvaPartBVerificationResult {
@@ -37,6 +91,8 @@ export interface DvaPartBVerificationResult {
     trustDecision: DvaTrustDecision;
     trustListVersion: string;
     policyVersion: string;
+    supportWindowVersion: string;
+    revocationStateVersion: string;
     verificationTimestampClass: string;
     admissionIdentity: string;
   };
