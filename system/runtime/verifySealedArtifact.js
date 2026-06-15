@@ -2,8 +2,8 @@
  * @license Apache License 2.0
  * @file orch/system/runtime/verifySealedArtifact.js
  * @title Sealed Artifact Verifier
- * @description Host-callable ONI verifier for sealed Orch kernel artifacts using embedded fingerprint, import sovereignty, target alignment, and DVA/meta consistency checks.
- * @version 0.2.1
+ * @description Host-callable ONI verifier for sealed Orch kernel artifacts using embedded fingerprint, import sovereignty, target alignment, and DVA-origin Part A artifact verification checks.
+ * @version 0.2.2
  */
 
 import {cborDecode} from '../../../source/wasm/cbor/deterministicCbor.js';
@@ -21,7 +21,7 @@ function makeRuntimeError({code, message, details, component = 'verifySealedArti
         return buildRuntimeError({
             code,
             message,
-            origin: 'host',
+            origin: 'dva',
             kind: 'configuration',
             severity: 'error',
             reason: 'invalid',
