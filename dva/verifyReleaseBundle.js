@@ -3,13 +3,22 @@
  * @file orch/dva/verifyReleaseBundle.js
  * @title Release Bundle Verifier
  * @description Verifier for signed release bundles, admission-bundle membership, artifact verification hashes, trust policy, support windows, revocation, and deterministic audit output.
- * @version 0.2.0
+ * @version 0.3.0
  */
 
-const ZERO_SHA256 =
-    '0000000000000000000000000000000000000000000000000000000₀₀₀₀₀₀₀₀';
+const ZERO_SHA256 = '0000000000000000000000000000000000000000000000000000000000000000';
 const SHA256_HEX_RE = /^[0-9a-f]{64}$/u;
+const ADMISSION_IDENTITY_RE =
+    /^dva:part-b:admission-identity:1:[0-9a-f]{64}$/u;
+const ADMISSION_IDENTITY_PREFIX = 'dva:part-b:admission-identity:1:';
+const ADMISSION_IDENTITY_INPUT_SCHEMA =
+    'dva:part-b:admission-identity-input:1';
 const TRUST_POLICY_SCHEMA = 'dva:part-b:trust-policy:1';
+const TRUST_ROOTS_SCHEMA = 'dva:part-b:trust-roots:1';
+const SUPPORT_WINDOW_SCHEMA = 'dva:part-b:support-window:1';
+const REVOCATION_STATE_SCHEMA = 'dva:part-b:revocation-state:1';
+const TRUST_MATERIAL_FRESHNESS_SCHEMA =
+    'dva:part-b:trust-material-freshness:1';
 const REQUIRED_TRUST_POLICY_FIELDS = [
     'schema',
     'trustListVersion',
@@ -24,14 +33,6 @@ const REQUIRED_TRUST_POLICY_FIELDS = [
 const ALLOWED_TRUST_POLICY_FIELDS = new Set([
     ...REQUIRED_TRUST_POLICY_FIELDS,
     'ext',
-    'offline',
-    'revocations',
-    'rollover',
-    'supportWindow',
-    'trustListExpiresAt',
-    'trustListIssuedAt',
-    'trustRoots',
-    'verificationTime',
 ]);
 const STALE_TRUST_LIST_BEHAVIORS = new Set([
     'deny',
@@ -42,6 +43,16 @@ const OFFLINE_VERIFIER_BEHAVIORS = new Set([
     'allow-if-fresh',
     'deny',
     'observe-only',
+]);
+const SUPPORT_WINDOW_DISPOSITIONS = new Set([
+    'admit',
+    'observe-only',
+    'deny',
+]);
+const VERIFICATION_TIMESTAMP_CLASSES = new Set([
+    'live-wall-clock',
+    'cached-trust-clock',
+    'omitted-deterministic',
 ]);
 const FIXED_DVA_COMPANION_ALIASES = new Map([
     ['dist/orch.release.json', 'orch.release.json'],
@@ -533,7 +544,7 @@ function canonicalJson(value) {
 }
 
 function canonicalJsonBytes(value) {
-    return te.encode(`${canonicalJson(value)}\n`);
+    return te.encode(canonicalJson(value));
 }
 
 function sameBytes(a, b) {
@@ -542,6 +553,20 @@ function sameBytes(a, b) {
         if (a[i] !== b[i]) return false;
     }
     return true;
+}
+
+function bytesWithFinalLf(input) {
+    const out = new Uint8Array(input.length + 1);
+    out.set(input, 0);
+    out[input.length] = 0x0a;
+    return out;
+}
+
+function matchesCanonicalJsonFileBytes(suppliedBytes, canonicalBytes) {
+    return (
+        sameBytes(suppliedBytes, canonicalBytes) ||
+        sameBytes(suppliedBytes, bytesWithFinalLf(canonicalBytes))
+    );
 }
 
 function skipJsonWhitespace(text, index) {
@@ -668,118 +693,72 @@ function normalizeTtlSeconds(value, errors) {
     return ttl;
 }
 
-function normalizedArray(value) {
-    return Array.from(new Set(Array.isArray(value) ? value : [])).sort(cmp);
+function releaseMemberTuple(entry) {
+    return `${entry.file}:${entry.hash}:${entry.manifestRoot}`;
 }
 
-async function trustRootsIdentity(trustRoots, cryptoProvider) {
-    const keys = Array.isArray(trustRoots?.keys) ? trustRoots.keys : [];
-    const out = [];
-    for (const key of keys) {
-        if (!key || typeof key.kid !== 'string') continue;
-        out.push({
-            kid: key.kid,
-            publicKeySha256:
-                typeof key.publicKeyPem === 'string'
-                    ? await sha256Hex(key.publicKeyPem, cryptoProvider)
-                    : null,
-        });
-    }
-    out.sort((a, b) => cmp(a.kid, b.kid));
-    return out;
+function requiredMemberTuple(entry) {
+    return `${entry.file}:${entry.kind}:${entry.hash || ''}`;
 }
 
-function revocationIdentity(revocations = {}) {
-    return {
-        revokedAdmissionIdentities: normalizedArray(
-            revocations.revokedAdmissionIdentities
-        ),
-        revokedKids: normalizedArray(revocations.revokedKids),
-        revokedManifestRoots: normalizedArray(revocations.revokedManifestRoots),
-    };
+function buildRequiredMembers({selected, selectedEntry}) {
+    const members = [
+        {
+            file: selected,
+            kind: 'manifest-entry',
+            hash: selectedEntry.hash,
+        },
+        {file: 'orch.release.cose', kind: 'fixed-companion'},
+        {file: 'orch.release.json', kind: 'fixed-companion'},
+    ];
+    members.sort((a, b) => cmp(requiredMemberTuple(a), requiredMemberTuple(b)));
+    return members;
 }
 
-function supportWindowIdentity(supportWindow = null) {
-    if (!supportWindow) return null;
-    return {
-        notAfter: supportWindow.notAfter || null,
-        notBefore: supportWindow.notBefore || null,
-    };
-}
-
-async function buildAdmissionIdentityInput({
+async function deriveAdmissionIdentity({
     actualArtifactHashes,
-    bundle,
-    companions,
     declared,
     embedded,
     manifest,
-    manifestCanonicalHash,
     missingRequiredMembers,
     policy,
     selected,
     signerKid,
-    undeclaredMembers,
+    supportWindowPolicy,
     cryptoProvider,
 }) {
     const selectedEntry = declared.get(selected) || null;
-    const presentedMembers = Array.from(bundle.keys()).sort(cmp);
-    const declaredFiles = Array.from(declared.keys()).sort(cmp);
-    return {
-        admissionBundleMembership: {
-            missingRequiredMembers: [...missingRequiredMembers].sort(cmp),
-            presentedMembers,
-            undeclaredMembers: [...undeclaredMembers].sort(cmp),
+    const actualHash = actualArtifactHashes.get(selected) || null;
+    const unavailable =
+        !selectedEntry ||
+        !actualHash ||
+        actualHash !== selectedEntry.hash ||
+        !SHA256_HEX_RE.test(manifest?.manifestRoot || '') ||
+        !SHA256_HEX_RE.test(embedded?.manifestRoot || '') ||
+        embedded.manifestRoot !== manifest.manifestRoot ||
+        !SHA256_HEX_RE.test(embedded?.fingerprint || '') ||
+        !signerKid ||
+        missingRequiredMembers.size > 0;
+    if (unavailable) return null;
+
+    const input = {
+        schema: ADMISSION_IDENTITY_INPUT_SCHEMA,
+        selectedArtifact: {
+            file: selected,
+            hash: actualHash,
+            manifestRoot: manifest.manifestRoot,
+            fingerprint: embedded.fingerprint,
         },
-        compatibilityOnlyDenial: {
-            selectedArtifactDeclared: !!selectedEntry,
-            selectedArtifactPresented: bundle.has(selected),
-        },
-        embeddedFingerprintConsistency: {
-            embeddedFingerprint: embedded.fingerprint || null,
-            embeddedManifestRoot: embedded.manifestRoot || null,
-            manifestFingerprint: manifest?.fingerprint || null,
-            matchesFingerprint:
-                !!manifest?.fingerprint &&
-                !!embedded.fingerprint &&
-                embedded.fingerprint === manifest.fingerprint,
-            matchesManifestRoot:
-                !!manifest?.manifestRoot &&
-                !!embedded.manifestRoot &&
-                embedded.manifestRoot === manifest.manifestRoot,
-        },
-        manifestDigest: manifestCanonicalHash,
-        manifestMembership: {
-            declaredFiles,
-            selectedArtifact: selected,
-            selectedArtifactDeclared: !!selectedEntry,
-        },
-        manifestRoot: manifest?.manifestRoot || null,
-        revocationState: revocationIdentity(policy.revocations),
-        selectedArtifact: selected,
-        selectedArtifactVerificationHash: {
-            actual: actualArtifactHashes.get(selected) || null,
-            declared: selectedEntry?.hash || null,
-        },
-        signerKid: signerKid || null,
-        supportWindowPolicy: supportWindowIdentity(policy.supportWindow),
-        trustListPolicy: {
-            allowKids: policy.allowKids,
-            denyKids: policy.denyKids,
-            keyRolloverOverlapSeconds: policy.keyRolloverOverlapSeconds,
-            offline: policy.offline,
-            offlineVerifierBehavior: policy.offlineVerifierBehavior,
-            policyVersion: policy.policyVersion,
-            rollover: policy.rollover || {},
-            schema: policy.schema,
-            staleTrustListBehavior: policy.staleTrustListBehavior,
-            trustListExpiresAt: policy.trustListExpiresAt,
-            trustListIssuedAt: policy.trustListIssuedAt,
-            trustListTtlSeconds: policy.trustListTtlSeconds,
-            trustListVersion: policy.trustListVersion,
-            trustRoots: await trustRootsIdentity(policy.trustRoots, cryptoProvider),
-        },
+        requiredMembers: buildRequiredMembers({selected, selectedEntry}),
+        signerKid,
+        trustListVersion: policy.trustListVersion,
+        policyVersion: policy.policyVersion,
+        supportWindowVersion: supportWindowPolicy.supportWindowVersion,
     };
+    return `${ADMISSION_IDENTITY_PREFIX}${await sha256Hex(
+        canonicalJson(input),
+        cryptoProvider
+    )}`;
 }
 
 function isSerializedPolicy(value) {
@@ -791,7 +770,7 @@ function isSerializedPolicy(value) {
     );
 }
 
-function parseTrustPolicyInput(input, errors) {
+function parseClosedJsonInput(input, {label, duplicateCode, malformedCode}, errors) {
     if (!isSerializedPolicy(input)) return input;
     try {
         const text = typeof input === 'string' ? input : td.decode(bytes(input));
@@ -802,13 +781,25 @@ function parseTrustPolicyInput(input, errors) {
         const duplicateKey = message.startsWith('Duplicate JSON object key:');
         addError(
             errors,
-            duplicateKey ? 'duplicate-key-trust-policy' : 'malformed-trust-policy',
+            duplicateKey ? duplicateCode : malformedCode,
             duplicateKey
-                ? 'Trust policy JSON contains a duplicate object key.'
-                : 'Trust policy JSON is malformed.'
+                ? `${label} JSON contains a duplicate object key.`
+                : `${label} JSON is malformed.`
         );
         return null;
     }
+}
+
+function parseTrustPolicyInput(input, errors) {
+    return parseClosedJsonInput(
+        input,
+        {
+            label: 'Trust policy',
+            duplicateCode: 'duplicate-key-trust-policy',
+            malformedCode: 'malformed-trust-policy',
+        },
+        errors
+    );
 }
 
 function addMalformedPolicyError(errors, message, details = {}) {
@@ -950,14 +941,45 @@ function normalizePolicy(input, errors) {
         keyRolloverOverlapSeconds: policy.keyRolloverOverlapSeconds,
         allowKids: policy.allowKids,
         denyKids: policy.denyKids,
-        verificationTime: policy.verificationTime || null,
-        trustListIssuedAt: policy.trustListIssuedAt || null,
-        trustListExpiresAt: policy.trustListExpiresAt || null,
-        offline: policy.offline === true,
-        supportWindow: policy.supportWindow || null,
-        revocations: policy.revocations || {},
-        rollover: policy.rollover || {},
-        trustRoots: policy.trustRoots || {},
+    };
+}
+
+function defaultSupportWindowPolicy(policy) {
+    return {
+        schema: SUPPORT_WINDOW_SCHEMA,
+        supportWindowVersion: 'default-empty',
+        policyVersion: policy?.policyVersion || 'default-empty',
+        entries: [],
+    };
+}
+
+function defaultRevocationState(policy) {
+    return {
+        schema: REVOCATION_STATE_SCHEMA,
+        revocationStateVersion: 'default-empty',
+        policyVersion: policy?.policyVersion || 'default-empty',
+        revokedKids: [],
+        revokedArtifacts: [],
+        revokedManifestRoots: [],
+        revokedReleaseMembers: [],
+        revokedAdmissionIdentities: [],
+    };
+}
+
+function defaultTrustMaterialFreshness({
+    policy,
+    supportWindowPolicy,
+    revocationState,
+}) {
+    return {
+        schema: TRUST_MATERIAL_FRESHNESS_SCHEMA,
+        trustListVersion: policy?.trustListVersion || 'default-empty',
+        policyVersion: policy?.policyVersion || 'default-empty',
+        supportWindowVersion:
+            supportWindowPolicy?.supportWindowVersion || 'default-empty',
+        revocationStateVersion:
+            revocationState?.revocationStateVersion || 'default-empty',
+        verificationTimestampClass: 'omitted-deterministic',
     };
 }
 
@@ -967,8 +989,670 @@ function failedPolicyAudit() {
         trustDecision: 'deny',
         trustListVersion: '',
         policyVersion: '',
+        supportWindowVersion: '',
+        revocationStateVersion: '',
         verificationTimestampClass: 'omitted-deterministic',
         admissionIdentity: '',
+    };
+}
+
+function addMalformedInputError(errors, code, message, details = {}) {
+    addError(errors, code, message, details);
+}
+
+function validateExtObject(input, code, errors) {
+    if (
+        Object.prototype.hasOwnProperty.call(input, 'ext') &&
+        !isPlainObject(input.ext)
+    ) {
+        addMalformedInputError(errors, code, 'ext must be an object.', {
+            field: 'ext',
+        });
+    }
+}
+
+function validateAllowedFields(input, allowed, code, label, errors) {
+    for (const field of Object.keys(input).sort(cmp)) {
+        if (!allowed.has(field)) {
+            addMalformedInputError(
+                errors,
+                code,
+                `${label} contains an unknown top-level field.`,
+                {field}
+            );
+        }
+    }
+}
+
+function validateRequiredFields(input, fields, code, label, errors) {
+    for (const field of fields) {
+        if (!Object.prototype.hasOwnProperty.call(input, field)) {
+            addMalformedInputError(
+                errors,
+                code,
+                `${label} is missing required field ${field}.`,
+                {field}
+            );
+        }
+    }
+}
+
+function validateInputString(input, field, code, errors) {
+    if (typeof input[field] !== 'string' || input[field].length === 0) {
+        addMalformedInputError(errors, code, `${field} must be a non-empty string.`, {
+            field,
+        });
+    }
+}
+
+function validateSha256Field(input, field, code, errors) {
+    if (!SHA256_HEX_RE.test(input[field])) {
+        addMalformedInputError(errors, code, `${field} must be SHA-256 hex.`, {
+            field,
+        });
+    }
+}
+
+function assertSortedUniqueStrings(values, field, code, errors, validator = null) {
+    if (!Array.isArray(values)) {
+        addMalformedInputError(errors, code, `${field} must be an array.`, {
+            field,
+        });
+        return;
+    }
+    const seen = new Set();
+    let previous = null;
+    for (let index = 0; index < values.length; index++) {
+        const value = values[index];
+        if (typeof value !== 'string' || value.length === 0) {
+            addMalformedInputError(
+                errors,
+                code,
+                `${field}[${index}] must be a non-empty string.`,
+                {field, index}
+            );
+            continue;
+        }
+        if (validator && !validator(value)) {
+            addMalformedInputError(
+                errors,
+                code,
+                `${field}[${index}] has an invalid value.`,
+                {field, index}
+            );
+        }
+        if (seen.has(value)) {
+            addMalformedInputError(errors, code, `${field} has duplicate values.`, {
+                field,
+            });
+        }
+        if (previous !== null && cmp(previous, value) > 0) {
+            addMalformedInputError(
+                errors,
+                code,
+                `${field} must be sorted using the canonical comparator.`,
+                {field}
+            );
+        }
+        seen.add(value);
+        previous = value;
+    }
+}
+
+function parseTrustRootsInput(input, errors) {
+    return parseClosedJsonInput(
+        input,
+        {
+            label: 'Trust roots',
+            duplicateCode: 'duplicate-key-trust-roots',
+            malformedCode: 'malformed-trust-roots',
+        },
+        errors
+    );
+}
+
+function normalizeTrustRoots(input, errors) {
+    const roots = parseTrustRootsInput(input || {schema: TRUST_ROOTS_SCHEMA, keys: []}, errors);
+    const code = 'malformed-trust-roots';
+    if (!isPlainObject(roots)) {
+        addMalformedInputError(errors, code, 'Trust roots must be a JSON object.');
+        return {schema: TRUST_ROOTS_SCHEMA, keys: []};
+    }
+    validateAllowedFields(
+        roots,
+        new Set(['schema', 'keys', 'ext']),
+        code,
+        'Trust roots',
+        errors
+    );
+    validateRequiredFields(roots, ['schema', 'keys'], code, 'Trust roots', errors);
+    if (roots.schema !== TRUST_ROOTS_SCHEMA) {
+        addMalformedInputError(errors, code, `schema must be exactly ${TRUST_ROOTS_SCHEMA}.`);
+    }
+    if (!Array.isArray(roots.keys)) {
+        addMalformedInputError(errors, code, 'keys must be an array.', {
+            field: 'keys',
+        });
+    } else {
+        const seen = new Set();
+        let previous = null;
+        for (let index = 0; index < roots.keys.length; index++) {
+            const key = roots.keys[index];
+            if (!isPlainObject(key)) {
+                addMalformedInputError(errors, code, `keys[${index}] must be an object.`, {
+                    index,
+                });
+                continue;
+            }
+            validateAllowedFields(
+                key,
+                new Set(['kid', 'publicKeyPem', 'ext']),
+                code,
+                `keys[${index}]`,
+                errors
+            );
+            validateInputString(key, 'kid', code, errors);
+            validateInputString(key, 'publicKeyPem', code, errors);
+            if (seen.has(key.kid)) {
+                addMalformedInputError(errors, code, 'keys has duplicate kid values.', {
+                    field: 'keys',
+                });
+            }
+            if (previous !== null && cmp(previous, key.kid) > 0) {
+                addMalformedInputError(errors, code, 'keys must be sorted by kid.', {
+                    field: 'keys',
+                });
+            }
+            seen.add(key.kid);
+            previous = key.kid;
+        }
+    }
+    validateExtObject(roots, code, errors);
+    return {
+        schema: roots.schema,
+        keys: Array.isArray(roots.keys) ? roots.keys : [],
+    };
+}
+
+function parseSupportWindowInput(input, errors) {
+    return parseClosedJsonInput(
+        input,
+        {
+            label: 'Support-window policy',
+            duplicateCode: 'duplicate-key-support-window-policy',
+            malformedCode: 'malformed-support-window-policy',
+        },
+        errors
+    );
+}
+
+function normalizeSupportWindowPolicy(input, policy, errors) {
+    const support = parseSupportWindowInput(
+        input || defaultSupportWindowPolicy(policy),
+        errors
+    );
+    const code = 'malformed-support-window-policy';
+    if (!isPlainObject(support)) {
+        addMalformedInputError(errors, code, 'Support-window policy must be a JSON object.');
+        return defaultSupportWindowPolicy(policy);
+    }
+    validateAllowedFields(
+        support,
+        new Set(['schema', 'supportWindowVersion', 'policyVersion', 'entries', 'ext']),
+        code,
+        'Support-window policy',
+        errors
+    );
+    validateRequiredFields(
+        support,
+        ['schema', 'supportWindowVersion', 'policyVersion', 'entries'],
+        code,
+        'Support-window policy',
+        errors
+    );
+    if (support.schema !== SUPPORT_WINDOW_SCHEMA) {
+        addMalformedInputError(errors, code, `schema must be exactly ${SUPPORT_WINDOW_SCHEMA}.`);
+    }
+    validateInputString(support, 'supportWindowVersion', code, errors);
+    validateInputString(support, 'policyVersion', code, errors);
+    if (support.policyVersion !== policy.policyVersion) {
+        addMalformedInputError(errors, code, 'policyVersion must match trust policy.', {
+            field: 'policyVersion',
+        });
+    }
+    if (!Array.isArray(support.entries)) {
+        addMalformedInputError(errors, code, 'entries must be an array.', {
+            field: 'entries',
+        });
+    } else {
+        const seen = new Set();
+        let previous = null;
+        for (let index = 0; index < support.entries.length; index++) {
+            const entry = support.entries[index];
+            if (!isPlainObject(entry)) {
+                addMalformedInputError(errors, code, `entries[${index}] must be an object.`, {
+                    index,
+                });
+                continue;
+            }
+            validateAllowedFields(
+                entry,
+                new Set([
+                    'file',
+                    'hash',
+                    'manifestRoot',
+                    'disposition',
+                    'admittedFrom',
+                    'admittedUntil',
+                    'ext',
+                ]),
+                code,
+                `entries[${index}]`,
+                errors
+            );
+            validateRequiredFields(
+                entry,
+                ['file', 'hash', 'manifestRoot', 'disposition'],
+                code,
+                `entries[${index}]`,
+                errors
+            );
+            if (typeof entry.file !== 'string' || entry.file.length === 0) {
+                addMalformedInputError(errors, code, 'entry.file must be a non-empty string.', {
+                    index,
+                });
+            }
+            validateSha256Field(entry, 'hash', code, errors);
+            validateSha256Field(entry, 'manifestRoot', code, errors);
+            if (!SUPPORT_WINDOW_DISPOSITIONS.has(entry.disposition)) {
+                addMalformedInputError(errors, code, 'entry.disposition is invalid.', {
+                    index,
+                });
+            }
+            for (const field of ['admittedFrom', 'admittedUntil']) {
+                if (
+                    Object.prototype.hasOwnProperty.call(entry, field) &&
+                    parseIsoMillis(entry[field], field, errors) == null
+                ) {
+                    addMalformedInputError(errors, code, `${field} must be RFC3339 UTC.`, {
+                        index,
+                        field,
+                    });
+                }
+            }
+            const normalizedEntry = {
+                ...entry,
+                file:
+                    typeof entry.file === 'string' && entry.file.length > 0
+                        ? normalizePath(entry.file)
+                        : entry.file,
+            };
+            const tuple = releaseMemberTuple(normalizedEntry);
+            if (seen.has(tuple)) {
+                addMalformedInputError(errors, code, 'entries has duplicate tuples.', {
+                    tuple,
+                });
+            }
+            if (previous !== null && cmp(previous, tuple) > 0) {
+                addMalformedInputError(errors, code, 'entries must be sorted by tuple.', {
+                    field: 'entries',
+                });
+            }
+            seen.add(tuple);
+            previous = tuple;
+            support.entries[index] = normalizedEntry;
+        }
+    }
+    validateExtObject(support, code, errors);
+    return {
+        schema: support.schema,
+        supportWindowVersion: support.supportWindowVersion,
+        policyVersion: support.policyVersion,
+        entries: Array.isArray(support.entries) ? support.entries : [],
+    };
+}
+
+function parseRevocationStateInput(input, errors) {
+    return parseClosedJsonInput(
+        input,
+        {
+            label: 'Revocation state',
+            duplicateCode: 'duplicate-key-revocation-state',
+            malformedCode: 'malformed-revocation-state',
+        },
+        errors
+    );
+}
+
+function normalizeRevocationState(input, policy, errors) {
+    const revocation = parseRevocationStateInput(
+        input || defaultRevocationState(policy),
+        errors
+    );
+    const code = 'malformed-revocation-state';
+    if (!isPlainObject(revocation)) {
+        addMalformedInputError(errors, code, 'Revocation state must be a JSON object.');
+        return defaultRevocationState(policy);
+    }
+    const arrayFields = [
+        'revokedKids',
+        'revokedArtifacts',
+        'revokedManifestRoots',
+        'revokedReleaseMembers',
+        'revokedAdmissionIdentities',
+    ];
+    validateAllowedFields(
+        revocation,
+        new Set([
+            'schema',
+            'revocationStateVersion',
+            'policyVersion',
+            ...arrayFields,
+            'ext',
+        ]),
+        code,
+        'Revocation state',
+        errors
+    );
+    validateRequiredFields(
+        revocation,
+        ['schema', 'revocationStateVersion', 'policyVersion', ...arrayFields],
+        code,
+        'Revocation state',
+        errors
+    );
+    if (revocation.schema !== REVOCATION_STATE_SCHEMA) {
+        addMalformedInputError(errors, code, `schema must be exactly ${REVOCATION_STATE_SCHEMA}.`);
+    }
+    validateInputString(revocation, 'revocationStateVersion', code, errors);
+    validateInputString(revocation, 'policyVersion', code, errors);
+    if (revocation.policyVersion !== policy.policyVersion) {
+        addMalformedInputError(errors, code, 'policyVersion must match trust policy.', {
+            field: 'policyVersion',
+        });
+    }
+    assertSortedUniqueStrings(revocation.revokedKids, 'revokedKids', code, errors);
+    assertSortedUniqueStrings(
+        revocation.revokedArtifacts,
+        'revokedArtifacts',
+        code,
+        errors,
+        (value) => SHA256_HEX_RE.test(value)
+    );
+    assertSortedUniqueStrings(
+        revocation.revokedManifestRoots,
+        'revokedManifestRoots',
+        code,
+        errors,
+        (value) => SHA256_HEX_RE.test(value)
+    );
+    assertSortedUniqueStrings(
+        revocation.revokedAdmissionIdentities,
+        'revokedAdmissionIdentities',
+        code,
+        errors,
+        (value) => ADMISSION_IDENTITY_RE.test(value)
+    );
+    if (!Array.isArray(revocation.revokedReleaseMembers)) {
+        addMalformedInputError(errors, code, 'revokedReleaseMembers must be an array.', {
+            field: 'revokedReleaseMembers',
+        });
+    } else {
+        const seen = new Set();
+        let previous = null;
+        for (let index = 0; index < revocation.revokedReleaseMembers.length; index++) {
+            const entry = revocation.revokedReleaseMembers[index];
+            if (!isPlainObject(entry)) {
+                addMalformedInputError(
+                    errors,
+                    code,
+                    `revokedReleaseMembers[${index}] must be an object.`,
+                    {index}
+                );
+                continue;
+            }
+            validateAllowedFields(
+                entry,
+                new Set(['file', 'hash', 'manifestRoot', 'ext']),
+                code,
+                `revokedReleaseMembers[${index}]`,
+                errors
+            );
+            validateRequiredFields(
+                entry,
+                ['file', 'hash', 'manifestRoot'],
+                code,
+                `revokedReleaseMembers[${index}]`,
+                errors
+            );
+            if (typeof entry.file !== 'string' || entry.file.length === 0) {
+                addMalformedInputError(errors, code, 'entry.file must be a non-empty string.', {
+                    index,
+                });
+            }
+            validateSha256Field(entry, 'hash', code, errors);
+            validateSha256Field(entry, 'manifestRoot', code, errors);
+            const normalizedEntry = {
+                ...entry,
+                file:
+                    typeof entry.file === 'string' && entry.file.length > 0
+                        ? normalizePath(entry.file)
+                        : entry.file,
+            };
+            const tuple = releaseMemberTuple(normalizedEntry);
+            if (seen.has(tuple)) {
+                addMalformedInputError(errors, code, 'revokedReleaseMembers has duplicate tuples.', {
+                    tuple,
+                });
+            }
+            if (previous !== null && cmp(previous, tuple) > 0) {
+                addMalformedInputError(
+                    errors,
+                    code,
+                    'revokedReleaseMembers must be sorted by tuple.',
+                    {field: 'revokedReleaseMembers'}
+                );
+            }
+            seen.add(tuple);
+            previous = tuple;
+            revocation.revokedReleaseMembers[index] = normalizedEntry;
+        }
+    }
+    validateExtObject(revocation, code, errors);
+    return {
+        schema: revocation.schema,
+        revocationStateVersion: revocation.revocationStateVersion,
+        policyVersion: revocation.policyVersion,
+        revokedKids: Array.isArray(revocation.revokedKids) ? revocation.revokedKids : [],
+        revokedArtifacts: Array.isArray(revocation.revokedArtifacts)
+            ? revocation.revokedArtifacts
+            : [],
+        revokedManifestRoots: Array.isArray(revocation.revokedManifestRoots)
+            ? revocation.revokedManifestRoots
+            : [],
+        revokedReleaseMembers: Array.isArray(revocation.revokedReleaseMembers)
+            ? revocation.revokedReleaseMembers
+            : [],
+        revokedAdmissionIdentities: Array.isArray(
+            revocation.revokedAdmissionIdentities
+        )
+            ? revocation.revokedAdmissionIdentities
+            : [],
+    };
+}
+
+function parseTrustMaterialFreshnessInput(input, errors) {
+    return parseClosedJsonInput(
+        input,
+        {
+            label: 'Trust material freshness',
+            duplicateCode: 'duplicate-key-trust-material-freshness',
+            malformedCode: 'malformed-trust-material-freshness',
+        },
+        errors
+    );
+}
+
+function normalizeTrustMaterialFreshness({
+    input,
+    policy,
+    supportWindowPolicy,
+    revocationState,
+    errors,
+}) {
+    const freshness = parseTrustMaterialFreshnessInput(
+        input ||
+            defaultTrustMaterialFreshness({
+                policy,
+                supportWindowPolicy,
+                revocationState,
+            }),
+        errors
+    );
+    const code = 'malformed-trust-material-freshness';
+    if (!isPlainObject(freshness)) {
+        addMalformedInputError(
+            errors,
+            code,
+            'Trust material freshness must be a JSON object.'
+        );
+        return defaultTrustMaterialFreshness({
+            policy,
+            supportWindowPolicy,
+            revocationState,
+        });
+    }
+    const timestampFields = [
+        'verificationTimestamp',
+        'trustListAsOf',
+        'supportWindowAsOf',
+        'revocationStateAsOf',
+    ];
+    validateAllowedFields(
+        freshness,
+        new Set([
+            'schema',
+            'trustListVersion',
+            'policyVersion',
+            'supportWindowVersion',
+            'revocationStateVersion',
+            'verificationTimestampClass',
+            ...timestampFields,
+            'ext',
+        ]),
+        code,
+        'Trust material freshness',
+        errors
+    );
+    validateRequiredFields(
+        freshness,
+        [
+            'schema',
+            'trustListVersion',
+            'policyVersion',
+            'supportWindowVersion',
+            'revocationStateVersion',
+            'verificationTimestampClass',
+        ],
+        code,
+        'Trust material freshness',
+        errors
+    );
+    if (freshness.schema !== TRUST_MATERIAL_FRESHNESS_SCHEMA) {
+        addMalformedInputError(
+            errors,
+            code,
+            `schema must be exactly ${TRUST_MATERIAL_FRESHNESS_SCHEMA}.`
+        );
+    }
+    for (const field of [
+        'trustListVersion',
+        'policyVersion',
+        'supportWindowVersion',
+        'revocationStateVersion',
+    ]) {
+        validateInputString(freshness, field, code, errors);
+    }
+    if (freshness.trustListVersion !== policy.trustListVersion) {
+        addMalformedInputError(errors, code, 'trustListVersion must match trust policy.', {
+            field: 'trustListVersion',
+        });
+    }
+    if (freshness.policyVersion !== policy.policyVersion) {
+        addMalformedInputError(errors, code, 'policyVersion must match trust policy.', {
+            field: 'policyVersion',
+        });
+    }
+    if (
+        freshness.supportWindowVersion !== supportWindowPolicy.supportWindowVersion
+    ) {
+        addMalformedInputError(
+            errors,
+            code,
+            'supportWindowVersion must match support-window policy.',
+            {field: 'supportWindowVersion'}
+        );
+    }
+    if (
+        freshness.revocationStateVersion !== revocationState.revocationStateVersion
+    ) {
+        addMalformedInputError(
+            errors,
+            code,
+            'revocationStateVersion must match revocation state.',
+            {field: 'revocationStateVersion'}
+        );
+    }
+    if (!VERIFICATION_TIMESTAMP_CLASSES.has(freshness.verificationTimestampClass)) {
+        addMalformedInputError(
+            errors,
+            code,
+            'verificationTimestampClass is invalid.',
+            {field: 'verificationTimestampClass'}
+        );
+    }
+    if (
+        freshness.verificationTimestampClass === 'live-wall-clock' ||
+        freshness.verificationTimestampClass === 'cached-trust-clock'
+    ) {
+        validateRequiredFields(
+            freshness,
+            timestampFields,
+            code,
+            'Trust material freshness',
+            errors
+        );
+        for (const field of timestampFields) {
+            if (parseIsoMillis(freshness[field], field, errors) == null) {
+                addMalformedInputError(errors, code, `${field} must be RFC3339 UTC.`, {
+                    field,
+                });
+            }
+        }
+    } else if (freshness.verificationTimestampClass === 'omitted-deterministic') {
+        for (const field of timestampFields) {
+            if (Object.prototype.hasOwnProperty.call(freshness, field)) {
+                addMalformedInputError(
+                    errors,
+                    code,
+                    `${field} must be omitted for omitted-deterministic freshness.`,
+                    {field}
+                );
+            }
+        }
+    }
+    validateExtObject(freshness, code, errors);
+    return {
+        schema: freshness.schema,
+        trustListVersion: freshness.trustListVersion,
+        policyVersion: freshness.policyVersion,
+        supportWindowVersion: freshness.supportWindowVersion,
+        revocationStateVersion: freshness.revocationStateVersion,
+        verificationTimestampClass: freshness.verificationTimestampClass,
+        verificationTimestamp: freshness.verificationTimestamp || null,
+        trustListAsOf: freshness.trustListAsOf || null,
+        supportWindowAsOf: freshness.supportWindowAsOf || null,
+        revocationStateAsOf: freshness.revocationStateAsOf || null,
     };
 }
 
@@ -1006,13 +1690,20 @@ function encodeCoseSigStructure({protectedBytes, payload}) {
     return cborEncode(['Signature1', protectedBytes, new Uint8Array(), payload]);
 }
 
-function selectPublicKey(kid, policy) {
-    const roots = policy.trustRoots;
+function selectPublicKey(kid, trustRoots) {
+    const roots = trustRoots;
     const keys = Array.isArray(roots.keys) ? roots.keys : [];
     return keys.find((entry) => entry?.kid === kid)?.publicKeyPem || null;
 }
 
-async function verifySignature({coseBytes, manifestBytes, policy, cryptoProvider, errors}) {
+async function verifySignature({
+    coseBytes,
+    manifestBytes,
+    policy,
+    trustRoots,
+    cryptoProvider,
+    errors,
+}) {
     let cose;
     try {
         cose = decodeCoseSign1(coseBytes);
@@ -1045,7 +1736,7 @@ async function verifySignature({coseBytes, manifestBytes, policy, cryptoProvider
         }
     }
 
-    const publicKeyPem = kid ? selectPublicKey(kid, policy) : null;
+    const publicKeyPem = kid ? selectPublicKey(kid, trustRoots) : null;
     if (kid && !publicKeyPem) {
         addError(errors, 'missing-public-key', 'No public key is available for signer kid.', {kid});
     }
@@ -1063,20 +1754,144 @@ async function verifySignature({coseBytes, manifestBytes, policy, cryptoProvider
     return kid;
 }
 
-function evaluateTrustPolicy({policy, signerKid, admissionIdentity, manifestRoot, errors}) {
-    const timeClass =
-        policy.verificationTime || policy.trustListIssuedAt || policy.trustListExpiresAt
-            ? 'cached-trust-clock'
-            : 'omitted-deterministic';
-    const now = policy.verificationTime;
+function evaluateFreshnessAge({freshness, field, policy, code, errors}) {
+    const nowMillis = parseIsoMillis(
+        freshness.verificationTimestamp,
+        'verificationTimestamp',
+        errors
+    );
+    const asOfMillis = parseIsoMillis(freshness[field], field, errors);
+    const ttlSeconds = normalizeTtlSeconds(policy.trustListTtlSeconds, errors);
+    if (nowMillis == null || asOfMillis == null || ttlSeconds == null) return false;
+    const ageSeconds = (nowMillis - asOfMillis) / 1000;
+    if (ageSeconds < 0 || ageSeconds > ttlSeconds) {
+        addError(errors, code, `${field} is stale under policy.`, {
+            field,
+            trustListTtlSeconds: policy.trustListTtlSeconds,
+            verificationTimestamp: freshness.verificationTimestamp,
+            asOf: freshness[field],
+        });
+        return true;
+    }
+    return false;
+}
+
+function findSupportWindowEntry({supportWindowPolicy, selectedTuple}) {
+    return supportWindowPolicy.entries.find(
+        (entry) => releaseMemberTuple(entry) === selectedTuple
+    );
+}
+
+function evaluateSupportWindowEntry({entry, freshness, errors}) {
+    if (!entry) return 'accept';
+    if (entry.disposition === 'deny') {
+        addError(errors, 'support-window-denied', 'Support-window policy denies this artifact.', {
+            tuple: releaseMemberTuple(entry),
+        });
+        return 'deny';
+    }
+    if (entry.disposition === 'observe-only') {
+        addError(
+            errors,
+            'support-window-observe-only',
+            'Support-window policy marks this artifact observe-only.',
+            {tuple: releaseMemberTuple(entry)}
+        );
+        return 'observe-only';
+    }
+    if (
+        freshness.verificationTimestampClass === 'omitted-deterministic' &&
+        (entry.admittedFrom || entry.admittedUntil)
+    ) {
+        addError(
+            errors,
+            'support-window-timestamp-unavailable',
+            'Time-bounded support-window admission requires a timestamp basis.',
+            {tuple: releaseMemberTuple(entry)}
+        );
+        return 'deny';
+    }
+    const now = freshness.verificationTimestamp;
+    if (now && entry.admittedFrom && compareIso(now, entry.admittedFrom) < 0) {
+        addError(errors, 'support-window-not-started', 'Support window has not started.');
+        return 'deny';
+    }
+    if (now && entry.admittedUntil && compareIso(entry.admittedUntil, now) < 0) {
+        addError(errors, 'support-window-expired', 'Support window is expired.');
+        return 'deny';
+    }
+    return 'accept';
+}
+
+function evaluateTrustPolicy({
+    policy,
+    supportWindowPolicy,
+    revocationState,
+    freshness,
+    signerKid,
+    admissionIdentity,
+    selectedTuple,
+    errors,
+}) {
+    const timeClass = freshness.verificationTimestampClass;
     const preexistingErrorCount = errors.length;
     let policyDecision = 'accept';
 
-    if (policy.offline && policy.offlineVerifierBehavior === 'deny') {
+    const trustListStale =
+        timeClass === 'omitted-deterministic'
+            ? policy.offlineVerifierBehavior === 'allow-if-fresh'
+            : evaluateFreshnessAge({
+                  freshness,
+                  field: 'trustListAsOf',
+                  policy,
+                  code: 'stale-trust-list',
+                  errors,
+              });
+    const supportWindowStale =
+        timeClass === 'omitted-deterministic'
+            ? false
+            : evaluateFreshnessAge({
+                  freshness,
+                  field: 'supportWindowAsOf',
+                  policy,
+                  code: 'stale-support-window',
+                  errors,
+              });
+    const revocationStateStale =
+        timeClass === 'omitted-deterministic'
+            ? false
+            : evaluateFreshnessAge({
+                  freshness,
+                  field: 'revocationStateAsOf',
+                  policy,
+                  code: 'stale-revocation-state',
+                  errors,
+              });
+    const offlineVerifier = timeClass !== 'live-wall-clock';
+
+    if (trustListStale) {
+        addError(errors, 'stale-trust-list', 'Trust list is stale under policy.', {
+            staleTrustListBehavior: policy.staleTrustListBehavior,
+        });
+        if (policy.staleTrustListBehavior === 'deny') {
+            policyDecision = 'deny';
+        } else {
+            policyDecision = policy.staleTrustListBehavior;
+        }
+    }
+    if (timeClass === 'omitted-deterministic' && policy.offlineVerifierBehavior === 'allow-if-fresh') {
+        addError(
+            errors,
+            'freshness-omitted-deterministic',
+            'Offline allow-if-fresh cannot accept with omitted-deterministic freshness.'
+        );
+        policyDecision = 'deny';
+    }
+    if (offlineVerifier && policy.offlineVerifierBehavior === 'deny') {
         addError(errors, 'offline-denied', 'Offline verification is denied by policy.');
         policyDecision = 'deny';
     } else if (
-        policy.offline &&
+        offlineVerifier &&
         policy.offlineVerifierBehavior === 'observe-only'
     ) {
         addError(
@@ -1086,85 +1901,63 @@ function evaluateTrustPolicy({policy, signerKid, admissionIdentity, manifestRoot
         );
         policyDecision = 'observe-only';
     }
-    const nowMillis = parseIsoMillis(now, 'verificationTime', errors);
-    const explicitExpiryMillis = parseIsoMillis(
-        policy.trustListExpiresAt,
-        'trustListExpiresAt',
-        errors
-    );
-    const issuedMillis = parseIsoMillis(
-        policy.trustListIssuedAt,
-        'trustListIssuedAt',
-        errors
-    );
-    const ttlSeconds = normalizeTtlSeconds(policy.trustListTtlSeconds, errors);
-    const ttlExpiryMillis =
-        issuedMillis != null && ttlSeconds != null
-            ? issuedMillis + ttlSeconds * 1000
-            : null;
-    const expiryMillis =
-        explicitExpiryMillis != null && ttlExpiryMillis != null
-            ? Math.min(explicitExpiryMillis, ttlExpiryMillis)
-            : (explicitExpiryMillis ?? ttlExpiryMillis);
 
-    if (nowMillis != null && expiryMillis != null && nowMillis > expiryMillis) {
-        addError(errors, 'stale-trust-list', 'Trust list is stale under policy.', {
-            staleTrustListBehavior: policy.staleTrustListBehavior,
-            trustListExpiresAt: policy.trustListExpiresAt,
-            trustListIssuedAt: policy.trustListIssuedAt,
-            trustListTtlSeconds: policy.trustListTtlSeconds,
-            ttlDerivedExpiresAt:
-                ttlExpiryMillis == null
-                    ? null
-                    : new Date(ttlExpiryMillis).toISOString(),
-            verificationTime: now,
-        });
-        if (policy.staleTrustListBehavior === 'deny') {
-            policyDecision = 'deny';
-        } else if (
-            policy.staleTrustListBehavior === 'quarantine' ||
-            policyDecision === 'accept'
-        ) {
-            policyDecision = policy.staleTrustListBehavior;
-        }
-    }
-    if (now && policy.supportWindow?.notBefore && compareIso(now, policy.supportWindow.notBefore) < 0) {
-        addError(errors, 'support-window-not-started', 'Support window has not started.');
-    }
-    if (now && policy.supportWindow?.notAfter && compareIso(policy.supportWindow.notAfter, now) < 0) {
-        addError(errors, 'support-window-expired', 'Support window is expired.');
+    const supportWindowDecision = evaluateSupportWindowEntry({
+        entry: findSupportWindowEntry({supportWindowPolicy, selectedTuple}),
+        freshness,
+        errors,
+    });
+    if (
+        supportWindowDecision === 'observe-only' &&
+        policyDecision === 'accept'
+    ) {
+        policyDecision = 'observe-only';
+    } else if (supportWindowDecision === 'deny') {
+        policyDecision = 'deny';
     }
 
-    const revokedKids = new Set(policy.revocations.revokedKids || []);
-    const revokedManifestRoots = new Set(policy.revocations.revokedManifestRoots || []);
-    const revokedAdmissionIdentities = new Set(policy.revocations.revokedAdmissionIdentities || []);
+    const revokedKids = new Set(revocationState.revokedKids || []);
+    const revokedArtifacts = new Set(revocationState.revokedArtifacts || []);
+    const revokedManifestRoots = new Set(revocationState.revokedManifestRoots || []);
+    const revokedReleaseMembers = new Set(
+        (revocationState.revokedReleaseMembers || []).map(releaseMemberTuple)
+    );
+    const revokedAdmissionIdentities = new Set(
+        revocationState.revokedAdmissionIdentities || []
+    );
     if (signerKid && revokedKids.has(signerKid)) {
         addError(errors, 'revoked-signer', 'Signer kid is revoked.', {kid: signerKid});
     }
+    const [, artifactHash, manifestRoot] = selectedTuple.split(':');
+    if (revokedArtifacts.has(artifactHash)) {
+        addError(errors, 'revoked-artifact', 'Artifact hash is revoked.', {
+            hash: artifactHash,
+        });
+    }
     if (revokedManifestRoots.has(manifestRoot)) {
-        addError(errors, 'revoked-release-member', 'Manifest root is revoked.', {manifestRoot});
+        addError(errors, 'revoked-manifest-root', 'Manifest root is revoked.', {manifestRoot});
+    }
+    if (revokedReleaseMembers.has(selectedTuple)) {
+        addError(errors, 'revoked-release-member', 'Release member is revoked.', {
+            tuple: selectedTuple,
+        });
     }
     if (revokedAdmissionIdentities.has(admissionIdentity)) {
         addError(errors, 'revoked-admission-identity', 'Admission identity is revoked.', {admissionIdentity});
-    }
-    if (
-        signerKid &&
-        now &&
-        policy.rollover?.overlapNotAfterByKid?.[signerKid] &&
-        compareIso(policy.rollover.overlapNotAfterByKid[signerKid], now) < 0
-    ) {
-        addError(errors, 'rollover-overlap-expired', 'Signer rollover overlap is expired.', {kid: signerKid});
     }
 
     const nonDenyPolicyErrors = new Set([
         'offline-observe-only',
         'stale-trust-list',
+        'support-window-observe-only',
     ]);
     const hasHardFailure =
         preexistingErrorCount > 0 ||
         errors.some((error) => !nonDenyPolicyErrors.has(error.code)) ||
         (errors.some((error) => error.code === 'stale-trust-list') &&
-            policy.staleTrustListBehavior === 'deny');
+            policy.staleTrustListBehavior === 'deny') ||
+        supportWindowStale ||
+        revocationStateStale;
 
     return {
         timeClass,
@@ -1234,10 +2027,38 @@ async function verifyReleaseBundle({
     members,
     selectedArtifact,
     trustPolicy = {},
+    trustRoots = null,
+    supportWindowPolicy = null,
+    revocationState = null,
+    trustMaterialFreshness = null,
     cryptoProvider,
 } = {}) {
     const errors = [];
     const policy = normalizePolicy(trustPolicy, errors);
+    const normalizedTrustRoots = normalizeTrustRoots(trustRoots, errors);
+    const normalizedSupportWindowPolicy = normalizeSupportWindowPolicy(
+        supportWindowPolicy,
+        policy || {policyVersion: 'default-empty'},
+        errors
+    );
+    const normalizedRevocationState = normalizeRevocationState(
+        revocationState,
+        policy || {policyVersion: 'default-empty'},
+        errors
+    );
+    const normalizedFreshness = normalizeTrustMaterialFreshness({
+        input: trustMaterialFreshness,
+        policy:
+            policy ||
+            {
+                trustListVersion: 'default-empty',
+                policyVersion: 'default-empty',
+                trustListTtlSeconds: 1,
+            },
+        supportWindowPolicy: normalizedSupportWindowPolicy,
+        revocationState: normalizedRevocationState,
+        errors,
+    });
     if (errors.length > 0) {
         const audit = failedPolicyAudit();
         return Object.freeze({
@@ -1284,7 +2105,6 @@ async function verifyReleaseBundle({
 
     let manifest = null;
     let canonicalManifestBytes = null;
-    let manifestCanonicalHash = null;
     let manifestRoot = null;
     let embeddedRoot = null;
     let admissionIdentity = null;
@@ -1294,8 +2114,12 @@ async function verifyReleaseBundle({
             const parsed = parseManifest(manifestBytes);
             manifest = parsed.manifest;
             canonicalManifestBytes = parsed.canonicalBytes;
-            manifestCanonicalHash = await sha256Hex(canonicalManifestBytes, cryptoProvider);
-            if (!sameBytes(bytes(manifestBytes), canonicalManifestBytes)) {
+            if (
+                !matchesCanonicalJsonFileBytes(
+                    bytes(manifestBytes),
+                    canonicalManifestBytes
+                )
+            ) {
                 addError(errors, 'non-canonical-manifest', 'Release manifest bytes are not canonical DVA JSON bytes.');
             }
             manifestRoot = await computeManifestRoot(manifest.entries, {cryptoProvider});
@@ -1364,7 +2188,10 @@ async function verifyReleaseBundle({
             if (!isPlainObject(payload.dva)) throw new Error('missing DVA map');
             embeddedRoot = payload.dva.manifestRoot;
             embedded.manifestRoot = payload.dva.manifestRoot;
-            embedded.fingerprint = payload.fingerprint;
+            embedded.fingerprint =
+                typeof payload.dva.fingerprint === 'string'
+                    ? payload.dva.fingerprint
+                    : payload.fingerprint;
             if (manifest?.manifestRoot && embeddedRoot !== manifest.manifestRoot) {
                 addError(errors, 'embedded-manifest-root-mismatch', 'Embedded DVA manifestRoot differs from manifest.', {
                     embedded: embeddedRoot,
@@ -1392,36 +2219,47 @@ async function verifyReleaseBundle({
             coseBytes,
             manifestBytes: canonicalManifestBytes,
             policy,
+            trustRoots: normalizedTrustRoots,
             cryptoProvider,
             errors,
         });
     }
 
-    const admissionIdentityInput = await buildAdmissionIdentityInput({
+    admissionIdentity = await deriveAdmissionIdentity({
         actualArtifactHashes,
-        bundle,
-        companions,
         declared,
         embedded,
         manifest,
-        manifestCanonicalHash,
         missingRequiredMembers,
         policy,
         selected,
         signerKid,
-        undeclaredMembers,
+        supportWindowPolicy: normalizedSupportWindowPolicy,
         cryptoProvider,
     });
-    admissionIdentity = await sha256Hex(
-        canonicalJson(admissionIdentityInput),
-        cryptoProvider
-    );
+    if (!admissionIdentity && errors.length === 0) {
+        addError(
+            errors,
+            'admission-identity-unavailable',
+            'Admission identity inputs are unavailable, malformed, or inconsistent.'
+        );
+        admissionIdentity = '';
+    } else if (!admissionIdentity) {
+        admissionIdentity = '';
+    }
 
     const policyEvaluation = evaluateTrustPolicy({
         policy,
+        supportWindowPolicy: normalizedSupportWindowPolicy,
+        revocationState: normalizedRevocationState,
+        freshness: normalizedFreshness,
         signerKid,
         admissionIdentity,
-        manifestRoot: manifest?.manifestRoot || null,
+        selectedTuple: releaseMemberTuple({
+            file: selected,
+            hash: actualArtifactHashes.get(selected) || '',
+            manifestRoot: manifest?.manifestRoot || '',
+        }),
         errors,
     });
 
@@ -1432,6 +2270,10 @@ async function verifyReleaseBundle({
         trustDecision: ok ? 'accept' : policyEvaluation.trustDecision,
         trustListVersion: policy.trustListVersion,
         policyVersion: policy.policyVersion,
+        supportWindowVersion:
+            normalizedSupportWindowPolicy.supportWindowVersion,
+        revocationStateVersion:
+            normalizedRevocationState.revocationStateVersion,
         verificationTimestampClass: policyEvaluation.timeClass,
         admissionIdentity,
     };
