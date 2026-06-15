@@ -3,7 +3,7 @@
  * @file orch/dva/verifyArtifactIdentity.js
  * @title Artifact Identity Verifier
  * @description Runtime/public entrypoints for selected-artifact verification and RuntimeError mapping.
- * @version 0.3.0
+ * @version 0.4.0
  */
 
 import {verifyReleaseBundle} from './verifyReleaseBundle.js';
@@ -16,12 +16,20 @@ const POLICY_FAILURE_CODES = new Set([
     'offline-denied',
     'offline-observe-only',
     'revoked-admission-identity',
+    'revoked-artifact',
+    'revoked-manifest-root',
     'revoked-release-member',
     'revoked-signer',
     'rollover-overlap-expired',
+    'freshness-omitted-deterministic',
+    'stale-revocation-state',
+    'stale-support-window',
     'stale-trust-list',
+    'support-window-denied',
     'support-window-expired',
     'support-window-not-started',
+    'support-window-observe-only',
+    'support-window-timestamp-unavailable',
     'unallowed-kid',
 ]);
 
