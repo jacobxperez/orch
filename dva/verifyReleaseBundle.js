@@ -3,7 +3,7 @@
  * @file orch/dva/verifyReleaseBundle.js
  * @title Release Bundle Verifier
  * @description Verifier for signed release bundles, admission-bundle membership, artifact verification hashes, trust policy, support windows, revocation, and deterministic audit output.
- * @version 0.3.0
+ * @version 0.4.0
  */
 
 const ZERO_SHA256 = '0000000000000000000000000000000000000000000000000000000000000000';
@@ -1733,6 +1733,21 @@ async function verifySignature({
         }
         if (!policy.allowKids.includes(kid)) {
             addError(errors, 'unallowed-kid', 'Signer kid is not allowed.', {kid});
+        } else if (
+            policy.allowKids.length > 1 &&
+            policy.keyRolloverOverlapSeconds === 0 &&
+            !policy.denyKids.includes(kid)
+        ) {
+            addError(
+                errors,
+                'rollover-overlap-inactive',
+                'Multiple active signer kids require a non-zero rollover overlap window.',
+                {
+                    kid,
+                    keyRolloverOverlapSeconds:
+                        policy.keyRolloverOverlapSeconds,
+                }
+            );
         }
     }
 
