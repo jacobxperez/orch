@@ -1,9 +1,11 @@
 # Node & tool caches
-node_modules/
+**/node_modules/
 .nyc_output/
 .cache/
+**/.cache/**
 .parcel-cache/
 .verdaccio_storage/
+.eslintcache
 
 # Build targets
 /target/
@@ -22,6 +24,9 @@ sourcemap-info.json
 .vscode/launch.json
 .vscode/tasks.json
 .idea/
+*.swp
+*.swo
+*~
 
 # Minified bundles
 *.min.js
@@ -33,6 +38,10 @@ log.json
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Coverage / transient test outputs
+coverage/
+*.lcov
 
 # Temp
 tmp
