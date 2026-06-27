@@ -10,7 +10,7 @@ Downloadable software for building deterministic AI workflows on a sealed runtim
 
 Download the current Orch public distribution archive:
 
-**[Download Orch](https://github.com/jacobxperez/orch/archive/refs/heads/main.zip)** <<<
+**[Download Orch](https://github.com/jacobxperez/orch/archive/refs/heads/main.zip)**
 
 > **Commercial note:** The sealed runtime binary named `orch*.wasm` is licensed for **evaluation use only**.  
 > To use Orch in **production**, **business**, or **embedded** settings, a **commercial license** is required. See **COMMERCIAL.md**.  
