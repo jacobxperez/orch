@@ -3,7 +3,7 @@
  * @file orch/system/runtime/loadOrchWasm.js
  * @title Orch WASM Loader
  * @description Resolves and loads the published browser or WASI Orch runtime artifacts without relying on the broader public proxy surface.
- * @version 0.2.0
+ * @version 0.2.1
  */
 
 import {verifySealedArtifact} from './verifySealedArtifact.js';
@@ -15,6 +15,12 @@ const ORCH_WASM_PATHS = Object.freeze({
     browser: new URL('../../public/wasm/orch.browser.wasm', import.meta.url).href,
     wasi: new URL('../../public/wasm/orch.wasi.wasm', import.meta.url).href,
 });
+
+function cmp(left, right) {
+    const a = String(left);
+    const b = String(right);
+    return a < b ? -1 : a > b ? 1 : 0;
+}
 
 function isNodeRuntime(runtime = globalThis) {
     return !!runtime?.process?.versions?.node;
@@ -69,7 +75,7 @@ const ORCH_WASM_PATH = ORCH_WASM_PATHS[resolveOrchWasmTarget()];
 async function listAvailableNodeTargets({paths, access, fileURLToPath}) {
     const available = [];
 
-    for (const target of Object.keys(paths).sort()) {
+    for (const target of Object.keys(paths).sort(cmp)) {
         const url = paths[target];
         try {
             await access(fileURLToPath(url));
