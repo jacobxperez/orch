@@ -2,8 +2,8 @@
  * @license Apache License 2.0
  * @file orch/system/proxies/intent.js
  * @title intent
- * @description Developer-facing proxy for `createIntent` inside orch.wasm. Validates args and forwards to the sealed kernel.
- * @version 1.1.0
+ * @description Developer-facing intent primitive proxy. Validates args and forwards the spec-owned K_INTENT_* operations to the sealed kernel.
+ * @version 1.2.0
  */
 
 import {kernel} from 'orch-kernel';
@@ -46,5 +46,27 @@ export const intent = Object.freeze(function intent(...args) {
 
     admitNativeMutation('intent');
 
-    return kernel.call('createIntent', {ctx, config});
+    const id = kernel.call('K_INTENT_CREATE', {
+        ctx,
+        humanPath: config.key,
+        initial: config.initial,
+        config,
+    });
+
+    return Object.freeze({
+        set: (next) => {
+            admitNativeMutation('intent');
+            return kernel.call('K_INTENT_SET', {id, next});
+        },
+        get: () => kernel.call('K_INTENT_GET', {id}),
+        clear: () => {
+            admitNativeMutation('intent');
+            return kernel.call('K_INTENT_CLEAR', {id});
+        },
+        status: () => kernel.call('K_INTENT_STATUS', {id}),
+        error: () => kernel.call('K_INTENT_ERROR', {id}),
+        errors: () => kernel.call('K_INTENT_ERRORS', {id}),
+        data: () => kernel.call('K_INTENT_DATA', {id}),
+        perf: () => kernel.call('K_INTENT_PERF', {id}),
+    });
 });
