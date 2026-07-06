@@ -3,7 +3,7 @@
  * @file orch/system/proxies/computed.js
  * @title computed
  * @description Developer-facing proxy for `createComputed` inside orch.wasm. Validates args and forwards to the sealed kernel.
- * @version 1.1.0
+ * @version 2.0.0
  */
 
 import {kernel} from 'orch-kernel';
@@ -24,14 +24,18 @@ import {admitNativeMutation} from '../runtime/localBoundary.js';
  * @returns {ComputedSignal} - Introspectable computed node from the sealed kernel.
  * @throws {TypeError} If arguments are invalid.
  */
-export const computed = Object.freeze(function computed(fn, key, ctx) {
+export const computed = Object.freeze(function computed(...args) {
+    if (args.length < 1 || args.length > 3) {
+        throw new TypeError('computed() expects (fn), (fn, key), or (fn, key, ctx)');
+    }
+    const [fn, key, ctx] = args;
     if (typeof fn !== 'function') {
         throw new TypeError('computed() requires a function as first argument');
     }
     if (key !== undefined && typeof key !== 'string') {
         throw new TypeError('computed key must be a string if provided');
     }
-    if (ctx !== undefined && typeof ctx !== 'object') {
+    if (ctx !== undefined && (ctx === null || typeof ctx !== 'object')) {
         throw new TypeError('computed ctx must be an object if provided');
     }
 
