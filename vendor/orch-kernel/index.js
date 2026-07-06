@@ -3,7 +3,7 @@
  * @file orch/vendor/orch-kernel/index.js
  * @title orch-kernel (dev shim)
  * @description Minimal shim to run the public Orch repo without the sealed WASM kernel, including deterministic unsupported public introspection. In sealed builds, the real kernel is used.
- * @version 0.6.0
+ * @version 0.7.0
  */
 
 /* ──────────────────────────────────────────────────────────
@@ -227,16 +227,46 @@ function createRoute(param = 'doc') {
 /* ──────────────────────────────────────────────────────────
    agent / intent (dev): no-op capability wrappers
    ────────────────────────────────────────────────────────── */
-function createAgent(_spec = {}) {
-    return {
-        run: async (input) => input,
-        spec: _spec,
-    };
+const __agents = new Map();
+const __intents = new Map();
+
+function requirePrimitiveHandle(handles, id, kind) {
+    const handle = handles.get(id);
+    if (!handle) throw new Error(`[orch-kernel shim] Unknown ${kind} id: ${String(id)}`);
+    return handle;
 }
-function createIntent(_name, fn = (x) => x) {
-    const impl = async (...args) => fn(...args);
-    impl.name = _name || 'intent';
-    return impl;
+
+function createAgent(spec = {}) {
+    let status = 'idle';
+    const id = spec.name ?? spec.spec?.key;
+    const handle = {
+        data: () => Object.freeze({type: 'agent', key: id, status}),
+        status: () => status,
+        error: () => null,
+        errors: () => Object.freeze([]),
+        perf: () => Object.freeze({start: 0, end: 0, duration: 0, timestamp: 0}),
+        suspend: () => { status = 'idle'; },
+        resume: () => { status = 'running'; },
+        terminate: () => { status = 'done'; },
+    };
+    __agents.set(id, handle);
+    return id;
+}
+function createIntent(spec = {}) {
+    const id = spec.humanPath ?? spec.config?.key ?? 'intent:default';
+    let value = spec.initial ?? spec.config?.initial ?? null;
+    const handle = {
+        set: (next) => { value = next; },
+        get: () => value,
+        clear: () => { value = null; },
+        status: () => 'idle',
+        error: () => null,
+        errors: () => Object.freeze([]),
+        data: () => Object.freeze({type: 'intent', key: id, value, status: 'idle'}),
+        perf: () => Object.freeze({start: 0, end: 0, duration: 0, timestamp: 0}),
+    };
+    __intents.set(id, handle);
+    return id;
 }
 
 /* ──────────────────────────────────────────────────────────
@@ -335,6 +365,44 @@ export const kernel = Object.freeze({
                 return createAgent(args.spec);
             case 'createIntent':
                 return createIntent(args.name, args.fn);
+            case 'K_AGENT_CREATE':
+                return createAgent(args);
+            case 'K_AGENT_SUSPEND':
+                return requirePrimitiveHandle(__agents, args.id, 'agent').suspend(args.reason);
+            case 'K_AGENT_RESUME':
+                return requirePrimitiveHandle(__agents, args.id, 'agent').resume();
+            case 'K_AGENT_TERMINATE':
+                return requirePrimitiveHandle(__agents, args.id, 'agent').terminate();
+            case 'K_AGENT_DATA':
+                return requirePrimitiveHandle(__agents, args.id, 'agent').data();
+            case 'K_AGENT_STATUS':
+                return requirePrimitiveHandle(__agents, args.id, 'agent').status();
+            case 'K_AGENT_ERROR':
+                return requirePrimitiveHandle(__agents, args.id, 'agent').error();
+            case 'K_AGENT_ERRORS':
+                return requirePrimitiveHandle(__agents, args.id, 'agent').errors();
+            case 'K_AGENT_PERF':
+                return requirePrimitiveHandle(__agents, args.id, 'agent').perf();
+            case 'K_INTENT_CREATE':
+                return createIntent(args);
+            case 'K_INTENT_SET':
+                return requirePrimitiveHandle(__intents, args.id, 'intent').set(args.next);
+            case 'K_INTENT_GET':
+                return requirePrimitiveHandle(__intents, args.id, 'intent').get();
+            case 'K_INTENT_CLEAR':
+                return requirePrimitiveHandle(__intents, args.id, 'intent').clear();
+            case 'K_INTENT_STATUS':
+                return requirePrimitiveHandle(__intents, args.id, 'intent').status();
+            case 'K_INTENT_ERROR':
+                return requirePrimitiveHandle(__intents, args.id, 'intent').error();
+            case 'K_INTENT_ERRORS':
+                return requirePrimitiveHandle(__intents, args.id, 'intent').errors();
+            case 'K_INTENT_DATA':
+                return requirePrimitiveHandle(__intents, args.id, 'intent').data();
+            case 'K_INTENT_PERF':
+                return requirePrimitiveHandle(__intents, args.id, 'intent').perf();
+            case 'K_INTENTM_TRIGGER':
+                throw new Error('[orch-kernel shim] Intent manager trigger is unavailable');
 
             /* Schema */
             case 'createSchema':
