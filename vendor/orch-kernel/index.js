@@ -3,7 +3,7 @@
  * @file orch/vendor/orch-kernel/index.js
  * @title orch-kernel (dev shim)
  * @description Minimal shim to run the public Orch repo without the sealed WASM kernel, including deterministic unsupported public introspection. In sealed builds, the real kernel is used.
- * @version 0.7.0
+ * @version 0.8.0
  */
 
 /* ──────────────────────────────────────────────────────────
@@ -237,17 +237,70 @@ function requirePrimitiveHandle(handles, id, kind) {
 }
 
 function createAgent(spec = {}) {
-    let status = 'idle';
     const id = spec.name ?? spec.spec?.key;
+    let phase = 'ready';
+    let suspendedReason = null;
+    let cancellationState = 'none';
+    const allowedSuspendReasons = new Set([
+        'backpressure',
+        'resource',
+        'external-wait',
+    ]);
+    const deferControl = (fn) => {
+        if (typeof queueMicrotask === 'function') queueMicrotask(fn);
+        else Promise.resolve().then(fn);
+    };
+    const status = () => {
+        if (cancellationState !== 'none') return cancellationState;
+        if (phase === 'running') return 'running';
+        if (phase === 'terminated') return 'done';
+        return 'idle';
+    };
     const handle = {
-        data: () => Object.freeze({type: 'agent', key: id, status}),
-        status: () => status,
+        data: () => Object.freeze({
+            type: 'agent',
+            key: id,
+            status: status(),
+            phase,
+            suspendedReason,
+        }),
+        status,
         error: () => null,
         errors: () => Object.freeze([]),
         perf: () => Object.freeze({start: 0, end: 0, duration: 0, timestamp: 0}),
-        suspend: () => { status = 'idle'; },
-        resume: () => { status = 'running'; },
-        terminate: () => { status = 'done'; },
+        suspend: (reason) => {
+            if (cancellationState !== 'none' || phase === 'terminated') return;
+            if (reason !== undefined && !allowedSuspendReasons.has(reason)) {
+                const error = new TypeError(
+                    '[orch-kernel shim] suspend reason must be backpressure, resource, or external-wait'
+                );
+                error.code = 'ERR_SCHEMA';
+                throw error;
+            }
+            deferControl(() => {
+                if (cancellationState !== 'none' || phase === 'terminated') return;
+                suspendedReason = reason ?? null;
+                phase = 'suspended';
+            });
+        },
+        resume: () => {
+            if (cancellationState !== 'none' || phase !== 'suspended') return;
+            deferControl(() => {
+                if (cancellationState !== 'none' || phase !== 'suspended') return;
+                suspendedReason = null;
+                phase = 'running';
+            });
+        },
+        terminate: () => {
+            if (cancellationState !== 'none' || phase === 'terminated') return;
+            cancellationState = 'canceling';
+            deferControl(() => {
+                if (cancellationState !== 'canceling') return;
+                suspendedReason = null;
+                phase = 'terminated';
+                cancellationState = 'cancelled';
+            });
+        },
     };
     __agents.set(id, handle);
     return id;
