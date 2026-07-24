@@ -2,8 +2,8 @@
  * @license Apache License 2.0
  * @file orch/system/runtime/localBoundary.js
  * @title ONI Local Runtime Boundary Reflection
- * @description Reflects Runtime Core local admission outcomes for mutation-capable ONI surfaces without owning policy.
- * @version 0.1.0
+ * @description Reflects Runtime Core local admission and current-context outcomes for mutation-capable ONI surfaces without owning policy.
+ * @version 0.2.0
  */
 
 const FALLBACK_ERROR = Object.freeze({
@@ -86,3 +86,23 @@ export function admitNativeMutation(surface, payload = {}) {
         decision: decision?.decision || 'allow',
     });
 }
+
+export function getCurrentExecutionContext() {
+    const boundary = getBoundary();
+    if (
+        !boundary ||
+        typeof boundary.getCurrentExecutionContext !== 'function'
+    ) {
+        return null;
+    }
+
+    const context = boundary.getCurrentExecutionContext();
+    return context && typeof context === 'object' ? context : null;
+}
+
+Object.defineProperty(admitNativeMutation, 'getCurrentExecutionContext', {
+    enumerable: false,
+    configurable: false,
+    writable: false,
+    value: getCurrentExecutionContext,
+});
