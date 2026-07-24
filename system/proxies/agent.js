@@ -3,7 +3,7 @@
  * @file orch/system/proxies/agent.js
  * @title agent
  * @description Developer-facing agent primitive family proxy. Validates the public call shapes and forwards spec-owned K_AGENT_* and K_INTENT_* operations to the sealed kernel.
- * @version 2.0.0
+ * @version 2.0.1
  */
 
 import {kernel} from 'orch-kernel';
@@ -35,17 +35,34 @@ function normalizeOptions(options, surface) {
     return options;
 }
 
-function requireContext(options, surface) {
+function assertContext(context, surface) {
+    if (context === null || typeof context !== 'object') {
+        throw new TypeError(`${surface} options.context must be an object`);
+    }
+    return context;
+}
+
+function resolveContext(options, surface) {
+    if (hasOwn(options, 'context')) {
+        return assertContext(options.context, surface);
+    }
+
+    const context = admitNativeMutation.getCurrentExecutionContext();
+    if (context === null || typeof context !== 'object') {
+        throw new TypeError(
+            `${surface} requires options.context or a runtime-bound current context`
+        );
+    }
+    return context;
+}
+
+function requireExplicitContext(options, surface) {
     if (!hasOwn(options, 'context')) {
         throw new TypeError(
             `${surface} requires options.context outside a runtime-bound current context`
         );
     }
-    const context = options.context;
-    if (context === null || typeof context !== 'object') {
-        throw new TypeError(`${surface} options.context must be an object`);
-    }
-    return context;
+    return assertContext(options.context, surface);
 }
 
 function stripContext(options) {
@@ -84,7 +101,7 @@ function createIntentSignalHandle(id) {
 function agentIntent(path, options = undefined) {
     assertPath(path, 'agent.intent');
     const normalized = normalizeOptions(options, 'agent.intent');
-    const ctx = requireContext(normalized, 'agent.intent');
+    const ctx = resolveContext(normalized, 'agent.intent');
     const config = {key: path};
     const payload = {ctx, humanPath: path, config};
 
@@ -101,7 +118,7 @@ function agentIntent(path, options = undefined) {
 function intentTrigger(path, payload = null, options = undefined) {
     assertPath(path, 'agent.intent.trigger');
     const normalized = normalizeOptions(options, 'agent.intent.trigger');
-    const ctx = requireContext(normalized, 'agent.intent.trigger');
+    const ctx = resolveContext(normalized, 'agent.intent.trigger');
 
     admitNativeMutation('intent');
     return kernel.call('K_INTENTM_TRIGGER', {ctx, path, payload});
@@ -129,7 +146,7 @@ const agentFacade = function agent(name, setupFn, options = undefined) {
     }
 
     const normalized = normalizeOptions(options, 'agent');
-    const ctx = requireContext(normalized, 'agent');
+    const ctx = requireExplicitContext(normalized, 'agent');
     const ownerOptions = stripContext(normalized);
 
     admitNativeMutation('agent');
