@@ -3,7 +3,7 @@
  * @file orch/system/index.js
  * @title Orch Public API
  * @description Frozen export surface for all developer-facing primitives and runtime utilities (note: plugin() executes outside orch.wasm)
- * @version 1.5.0
+ * @version 2.0.0
  */
 
 import {ORCH_WASM_PATH, ORCH_WASM_PATHS} from './runtime/loadOrchWasm.js';
@@ -34,7 +34,6 @@ export {fetch} from './proxies/fetch.js';
 
 // 🧠 AI primitives
 export {agent} from './proxies/agent.js';
-export {intent} from './proxies/intent.js';
 
 // 🛤️ Routing
 export {route} from './proxies/route.js';
