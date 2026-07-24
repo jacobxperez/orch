@@ -3,7 +3,7 @@
  * @file orch/vendor/orch-kernel/index.js
  * @title orch-kernel (dev shim)
  * @description Minimal shim to run the public Orch repo without the sealed WASM kernel, including deterministic unsupported public introspection. In sealed builds, the real kernel is used.
- * @version 0.8.0
+ * @version 0.8.1
  */
 
 /* ──────────────────────────────────────────────────────────
@@ -455,7 +455,14 @@ export const kernel = Object.freeze({
             case 'K_INTENT_PERF':
                 return requirePrimitiveHandle(__intents, args.id, 'intent').perf();
             case 'K_INTENTM_TRIGGER':
-                throw new Error('[orch-kernel shim] Intent manager trigger is unavailable');
+                {
+                    const error = new Error('[orch-kernel shim] Intent manager trigger is unavailable');
+                    error.code = 'ERR_HOST_UNAVAILABLE';
+                    error.origin = 'host';
+                    error.surface = 'agent.intent.trigger';
+                    error.details = Object.freeze({reason: 'unsupported-target'});
+                    throw error;
+                }
 
             /* Schema */
             case 'createSchema':
