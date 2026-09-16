@@ -8,15 +8,15 @@
     "browser": {
       "file": "orch.browser.wasm",
       "previewTarget": "browser",
-      "sha256": "9ff7c01a913ac3e41f926caf02e0c6475b9c01f87a0bcc705bd07de10d4b3299",
+      "sha256": "e50467586d8311b821f45909fa044e41f49b87467719b0aaffd2a482981ac903",
       "sizeBytes": 82136
     },
     "wasi": {
       "file": "orch.wasi.wasm",
       "previewTarget": "wasi-p1",
-      "sha256": "4ed91f64b8d13e7c3e22ea54e29434c23f3190256a430378c1fef46670f1934d",
+      "sha256": "0dbcdd8ccf2ce36f53896c0bb57311087389a06915a4fd2bb97ec56fe26ff758",
       "sizeBytes": 82133
     }
   },
-  "version": "0.1.1-fa64c1ab"
+  "version": "0.1.1-c6eadfff"
 }
