@@ -1,10 +1,10 @@
 {
   "name": "orch-kernel",
-  "version": "0.0.0-dev",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
-  "main": "./index.js",
+  "main": "./production.js",
   "exports": {
-    ".": "./index.js"
+    ".": "./production.js"
   }
 }
