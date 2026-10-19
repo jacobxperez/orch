@@ -1,13 +1,13 @@
-# Trademark Policy for Orch™
+# Trademark Policy for Orch®
 
 © 2026 Jacob Perez. All rights reserved.  
-**Orch™** is a trademark of Jacob Perez.
+**Orch®** is a trademark of Jacob Perez.
 
 ---
 
 ## Overview
 
-The name **Orch**, the wordmark **Orch™**, the Orch logo(s), and related brand assets are protected trademarks of Jacob Perez.
+The name **Orch**, the wordmark **Orch®**, the Orch logo(s), and related brand assets are protected trademarks of Jacob Perez.
 
 Protected brand assets include, without limitation:
 
@@ -46,7 +46,7 @@ You may use the **Orch** name nominatively to:
 - Do not pluralize or modify Orch in a way that implies your own brand.
 - Do not use Orch as the leading distinctive element of your product, company, package, module, service, domain, social handle, or project name.
 - Include a clear attribution statement when appropriate, such as:  
-  “Orch™ is a trademark of Jacob Perez.”
+  “Orch® is a trademark of Jacob Perez.”
 
 Permitted nominative use does not imply endorsement, sponsorship, certification, commercial licensing, host approval, or affiliation.
 
@@ -56,7 +56,7 @@ Permitted nominative use does not imply endorsement, sponsorship, certification,
 
 You may not:
 
-- Use **Orch**, **Orch™**, `orch:`, the Orch logo, or confusingly similar names or marks in a way that suggests affiliation, sponsorship, endorsement, certification, official status, host approval, or approval by the Orch project.
+- Use **Orch**, **Orch®**, `orch:`, the Orch logo, or confusingly similar names or marks in a way that suggests affiliation, sponsorship, endorsement, certification, official status, host approval, or approval by the Orch project.
 - Register or use names that are derivatives, lookalikes, or confusingly similar to Orch, including but not limited to:
   - **Orchex**
   - **OrchLite**
@@ -198,7 +198,7 @@ Unofficial fan, education, or community accounts must clearly identify themselve
 When attribution is appropriate, use the following statement:
 
 ```txt
-Orch™ is a trademark of Jacob Perez.
+Orch® is a trademark of Jacob Perez.
 ```
 
 Do not use attribution in a way that implies endorsement, sponsorship, affiliation, certification, host approval, or approval.
@@ -229,4 +229,4 @@ For permissions, brand questions, trademark questions, certification requests, c
 
 ---
 
-© 2026 Jacob Perez. Orch™ is a trademark of Jacob Perez. All rights reserved.
+© 2026 Jacob Perez. Orch® is a trademark of Jacob Perez. All rights reserved.

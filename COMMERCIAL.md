@@ -148,4 +148,4 @@ This file describes commercial licensing only. It does not replace the Runtime E
 
 ---
 
-© 2026 Jacob Perez. Orch™ is a trademark of Jacob Perez. All rights reserved.
+© 2026 Jacob Perez. Orch® is a trademark of Jacob Perez. All rights reserved.

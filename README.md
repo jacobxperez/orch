@@ -149,4 +149,4 @@ For a plain-language explanation of how Orch separates Apache-licensed public in
 
 ---
 
-© 2026 Jacob Perez. Orch™ is a trademark of Jacob Perez. All rights reserved.
+© 2026 Jacob Perez. Orch® is a trademark of Jacob Perez. All rights reserved.
