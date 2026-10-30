@@ -3,7 +3,7 @@
  * @file orch/vendor/orch-kernel/index.js
  * @title orch-kernel (dev shim)
  * @description Minimal shim to run the public Orch repo without the sealed WASM kernel, including deterministic unsupported public introspection. In sealed builds, the real kernel is used.
- * @version 0.8.1
+ * @version 1.0.0
  */
 
 /* ──────────────────────────────────────────────────────────
@@ -135,7 +135,8 @@ function createTask(_name, handler) {
         }
     }
 
-    return {loading, error, result, run};
+    const task = {loading, error, result, run};
+    return task;
 }
 
 /* ──────────────────────────────────────────────────────────
@@ -164,11 +165,12 @@ function mountComponent(target, component, props) {
             el.innerHTML = node != null ? String(node) : '';
         }
     }
-    return {
+    const mounted = {
         unmount() {
             if (el && typeof document !== 'undefined') el.innerHTML = '';
         },
     };
+    return mounted;
 }
 
 function unmount(target) {
@@ -332,17 +334,6 @@ function createSchema(def) {
 /* ──────────────────────────────────────────────────────────
    Introspection + data (dev)
    ────────────────────────────────────────────────────────── */
-const __introspection = new Map();
-function introspectRegister(key, api) {
-    __introspection.set(key, api);
-}
-function introspectGet(key) {
-    return __introspection.get(key);
-}
-function introspectGetAll() {
-    return Array.from(__introspection.values());
-}
-
 const __dataRegistry = new Map();
 function dataRegister(key, value) {
     __dataRegistry.set(key, value);
@@ -350,10 +341,6 @@ function dataRegister(key, value) {
 function dataGet(key) {
     return __dataRegistry.get(key);
 }
-function dataGetAll() {
-    return Array.from(__dataRegistry.values());
-}
-
 function createUnsupportedIntrospectionResult() {
     return Object.freeze({
         schemaVersion: 'introspection-unsupported-result.v1',
@@ -471,26 +458,16 @@ export const kernel = Object.freeze({
             /* Introspection */
             case 'createIntrospect':
                 return createUnsupportedIntrospectionResult();
-            case 'introspect.register':
-                return introspectRegister(args.key, args.api);
-            case 'introspect.get':
-                return introspectGet(args.key);
-            case 'introspect.getAll':
-                return introspectGetAll();
 
             /* Data registry (if your proxies use it) */
             case 'data.register':
                 return dataRegister(args.key, args.value);
             case 'data.get':
                 return dataGet(args.key);
-            case 'data.getAll':
-                return dataGetAll();
-
             default:
                 if (typeof console !== 'undefined' && console.warn) {
                     console.warn(
-                        `[orch-kernel shim] Unimplemented kernel.call("${name}")`,
-                        args
+                        `[orch-kernel shim] Unimplemented kernel.call("${name}")`
                     );
                 }
                 return undefined;
